@@ -31,15 +31,6 @@ public class ClientRepository {
     }
 
     public boolean update(Client client) {
-        //================== PROBAR ESTE PROCESO ++++++++++++++++++++++
-//        for (Client c : this.clients) {
-//            if (c.getId() == client.getId()) {
-//                this.clients.remove(c);
-//                this.clients.add(client);
-//                return true;
-//            }
-//        }
-
         for (int i = 0; i < this.clients.size(); i++) {
             if (this.clients.get(i).getId() == client.getId()) {
                 this.clients.set(i, client);
@@ -67,14 +58,30 @@ public class ClientRepository {
 
     public List<Client> findAll() {
         return clients.stream()
-                .sorted((c1, c2) -> c1.getRaisonSociale().compareToIgnoreCase(c2.getRaisonSociale()))
+                .sorted((c1, c2) ->
+                        c1.getRaisonSociale().compareToIgnoreCase(c2.getRaisonSociale()))
                 .collect(Collectors.toList());
     }
 
     public void initialiserDonneesDemo() {
-        Adresse adresse1 = new Adresse("10", "Victor Hugo", "54000", "Nancy");
-        Adresse adresse2 = new Adresse("102", "Victor Duquesnay", "97233", "Schoelcher");
-        Adresse adresse3 = new Adresse("25", "L'Esperance", "54390", "Frouard");
+        Adresse adresse1 = new Adresse(
+                "10",
+                "Victor Hugo",
+                "54000",
+                "Nancy"
+        );
+        Adresse adresse2 = new Adresse(
+                "102",
+                "Victor Duquesnay",
+                "97233",
+                "Schoelcher"
+        );
+        Adresse adresse3 = new Adresse(
+                "25",
+                "L'Esperance",
+                "54390",
+                "Frouard"
+        );
 //        Contrat contrat1 = new Contrat("1","Mega", 50000);
         new Client(
                 "IBM",
@@ -85,7 +92,6 @@ public class ClientRepository {
                 5000,
                 10
         );
-
         new Client(
                 "Apple",
                 adresse2,
@@ -95,7 +101,6 @@ public class ClientRepository {
                 50000,
                 100
         );
-
         new Client(
                 "Microsoft",
                 adresse3,
@@ -105,8 +110,5 @@ public class ClientRepository {
                 500000,
                 1000
         );
-
-
     }
-
 }

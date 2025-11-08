@@ -19,4 +19,8 @@ public class LoggingService {
                 System.err.println("Erreur d'écriture dans le log: " + e.getMessage());
         }
     }
+
+    public static void logError(String message, Exception e) {
+        log("ERREUR: " + message + " - " + e.getMessage());
+    }
 }
