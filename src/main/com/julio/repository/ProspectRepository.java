@@ -5,6 +5,7 @@ import main.com.julio.service.LoggingService;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class ProspectRepository {
     private List<Prospect> prospects;
@@ -44,6 +45,14 @@ public class ProspectRepository {
                 .findFirst()
                 .orElse(null);
     }
+
+    public List<Prospect> findAll() {
+        return prospects.stream()
+                .sorted((p1, p2) ->
+                        p1.getRaisonSociale().compareToIgnoreCase(p2.getRaisonSociale()))
+                .collect(Collectors.toList());
+    }
+
     private void initialiserDonneesDemo() {
     }
 }
