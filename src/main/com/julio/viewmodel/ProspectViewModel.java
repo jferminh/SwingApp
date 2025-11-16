@@ -9,6 +9,7 @@ import main.com.julio.repository.ProspectRepository;
 import main.com.julio.service.LoggingService;
 import main.com.julio.service.UnicityService;
 
+import javax.swing.table.DefaultTableModel;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.logging.Logger;
@@ -125,5 +126,32 @@ public class ProspectViewModel {
 
     public List<Prospect> getTousLesProspects() {
         return prospectRepo.findAll();
+    }
+
+    public DefaultTableModel construireTableModel() {
+        String[] colonnes = {"ID", "Raison Sociale", "Adresse", "Téléphone",
+                "Email", "Date Prospection", "Intéressé"};
+        DefaultTableModel model = new DefaultTableModel(colonnes, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+
+        List<Prospect> prospects = getTousLesProspects();
+        for (Prospect prospect : prospects) {
+            Object[] row = {
+                    prospect.getId(),
+                    prospect.getRaisonSociale(),
+                    prospect.getAdresse().toString(),
+                    prospect.getTelephone(),
+                    prospect.getEmail(),
+                    prospect.getDateProspectionFormatee(),
+                    prospect.getInteresse().getLibelle()
+            };
+            model.addRow(row);
+        }
+
+        return model;
     }
 }

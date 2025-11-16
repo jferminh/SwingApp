@@ -1,8 +1,12 @@
 package main.com.julio.repository;
 
+import main.com.julio.model.Adresse;
+import main.com.julio.model.Interesse;
 import main.com.julio.model.Prospect;
 import main.com.julio.service.LoggingService;
+import main.com.julio.util.DateUtils;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -54,5 +58,30 @@ public class ProspectRepository {
     }
 
     private void initialiserDonneesDemo() {
+        Adresse adresse1 = new Adresse("10", "Metz", "54390", "Frouard");
+        Adresse adresse2 = new Adresse("101", "De La Resistance", "54390", "Frouard");
+
+        prospects.add(
+                new Prospect(
+                        "Boulangerie", adresse1,
+                        "0696589632",
+                        "boulangerie@boulangerie.fr",
+                        "",
+                        DateUtils.parseDate("10/01/2021"),
+                        Interesse.OUI
+                )
+        );
+        prospects.add(
+                new Prospect(
+                        "Supermarché", adresse2,
+                        "0123456789",
+                        "supermarche@supermarche.fr",
+                        "",
+                        DateUtils.parseDate("12/01/2024"),
+                        Interesse.OUI
+                )
+        );
+
     }
+
 }

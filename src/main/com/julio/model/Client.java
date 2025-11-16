@@ -35,7 +35,7 @@ public class Client extends Societe {
 
     public void setChiffreAffaires(long chiffreAffaires) {
         if (chiffreAffaires < 200) {
-            throw new ValidationException("chiffreAffaires", "Le chiffre affaire doit être >= 200.");
+            throw new ValidationException("chiffreAffaires", "Le chiffre d'affaires doit être >= 200.");
         }
         this.chiffreAffaires = chiffreAffaires;
     }

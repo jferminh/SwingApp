@@ -82,4 +82,8 @@ public abstract class Societe {
     }
 
     public abstract String getTypeSociete();
+
+    public static void resetCompteur() {
+        compteurId = 1;
+    }
 }

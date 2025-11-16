@@ -1,13 +1,35 @@
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-void main() {
-    //TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
-    // to see how IntelliJ IDEA suggests fixing it.
-    IO.println(String.format("Hello and welcome!"));
+import main.com.julio.repository.ClientRepository;
+import main.com.julio.repository.ContratRepository;
+import main.com.julio.repository.ProspectRepository;
+import main.com.julio.service.UnicityService;
+import main.com.julio.view.AccueilView;
+import main.com.julio.viewmodel.ClientViewModel;
+import main.com.julio.viewmodel.ProspectViewModel;
 
-    for (int i = 1; i <= 5; i++) {
-        //TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-        // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-        IO.println("i = " + i);
+import javax.swing.*;
+
+
+void main() {
+    try {
+        UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+    } catch (Exception e) {
+        e.printStackTrace();
     }
+
+    // Initialisation des repositories
+    ClientRepository clientRepo = new ClientRepository();
+    ProspectRepository prospectRepo = new ProspectRepository();
+    ContratRepository contratRepo = new ContratRepository();
+
+    // Initialisation des services
+    UnicityService unicityService = new UnicityService(clientRepo, prospectRepo);
+
+    // Initialisation des ViewModels
+    ClientViewModel clientVM = new ClientViewModel(clientRepo, contratRepo, unicityService);
+    ProspectViewModel prospectVM = new ProspectViewModel(prospectRepo, unicityService);
+
+    SwingUtilities.invokeLater(() -> {
+        AccueilView accueil = new AccueilView(clientVM, prospectVM);
+        accueil.setVisible(true);
+    });
 }

@@ -40,7 +40,7 @@ public class Prospect extends Societe {
 
     public void setInteresse(Interesse interesse) {
         if (interesse == null) {
-            throw new ValidationException("interesse", "Le champ 'intéressé' est obligatoire.");
+            throw new ValidationException("intéressé", "Le champ 'intéressé' est obligatoire.");
         }
         this.interesse = interesse;
     }

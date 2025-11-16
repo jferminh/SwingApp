@@ -15,8 +15,8 @@ public class LoggingService {
         try (PrintWriter writer = new PrintWriter(new FileWriter(LOG_FILE, true))) {
             String timestamp = LocalDateTime.now().format(TIMESTAMP_FORMAT);
             writer.println("[" + timestamp + "] " + message);
-            } catch (IOException e) {
-                System.err.println("Erreur d'écriture dans le log: " + e.getMessage());
+        } catch (IOException e) {
+            System.err.println("Erreur d'écriture dans le log: " + e.getMessage());
         }
     }
 

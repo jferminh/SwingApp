@@ -78,4 +78,8 @@ public class Adresse {
         return numeroRue + " " + nomRue + " " + codePostal + " " + ville;
     }
 
+    public static void resetCompteur(){
+        compteurId = 1;
+    }
+
 }

@@ -83,7 +83,7 @@ public class ClientRepository {
                 "Frouard"
         );
 //        Contrat contrat1 = new Contrat("1","Mega", 50000);
-        new Client(
+        clients.add(new Client(
                 "IBM",
                 adresse1,
                 "0778663083",
@@ -91,24 +91,25 @@ public class ClientRepository {
                 "",
                 5000,
                 10
-        );
-        new Client(
+        ));
+
+        clients.add(new Client(
                 "Apple",
                 adresse2,
-                "155466284",
+                "0778663083",
                 "apple@apple.com",
                 "",
                 50000,
                 100
-        );
-        new Client(
+        ));
+        clients.add(new Client(
                 "Microsoft",
                 adresse3,
-                "987456213",
+                "0778663083",
                 "microsoft@microsoft.com",
                 "",
                 500000,
                 1000
-        );
+        ));
     }
 }
