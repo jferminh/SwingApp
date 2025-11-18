@@ -1,6 +1,7 @@
 package main.com.julio.viewmodel;
 
 import main.com.julio.exception.NotFoundException;
+import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Client;
 import main.com.julio.model.Contrat;
 import main.com.julio.repository.ClientRepository;
@@ -11,19 +12,19 @@ import javax.swing.table.DefaultTableModel;
 import java.util.List;
 
 public class ContratViewModel {
-    private ContratRepository contratRepo;
-    private ClientRepository clientRepo;
+    private final ContratRepository contratRepo;
+    private final ClientRepository clientRepo;
 
     public ContratViewModel(ContratRepository contratRepo, ClientRepository clientRepo) {
         this.contratRepo = contratRepo;
         this.clientRepo = clientRepo;
     }
 
-    public Contrat creerContrat(int clientId, String nomContrat, double montant) {
+    public Contrat creerContrat(int clientId, String nomContrat, double montant) throws ValidationException {
         try {
             Client client = clientRepo.findById(clientId);
             if (client == null) {
-                throw new NotFoundException("Client introuvable");
+                throw new ValidationException("Client introuvable");
             }
 
             Contrat contrat = new Contrat(clientId, nomContrat, montant);
@@ -32,7 +33,6 @@ public class ContratViewModel {
 
             client.ajouterContrat(contrat);
 
-            LoggingService.log("Contrat créé avec succès: " + nomContrat);
             return contrat;
         } catch (Exception e) {
             LoggingService.logError("Erreur création contrat", e);
@@ -40,22 +40,17 @@ public class ContratViewModel {
         }
     }
 
-    public boolean modifierContrat(int id, String nomContrat, double montant) {
+    public boolean modifierContrat(int id, String nomContrat, double montant) throws ValidationException {
         try {
             Contrat contrat = contratRepo.findById(id);
             if (contrat == null) {
-                throw new NotFoundException("Contrat introuvable");
+                throw new ValidationException("Contrat introuvable");
             }
 
             contrat.setNomContrat(nomContrat);
             contrat.setMontant(montant);
 
-            boolean success = contratRepo.update(contrat);
-
-            if (success) {
-                LoggingService.log("Contrat modifié avec succès: ID= " + id);
-            }
-            return success;
+            return contratRepo.update(contrat);
         } catch (Exception e) {
             LoggingService.logError("Erreur modification contrat", e);
             throw e;
@@ -100,8 +95,8 @@ public class ContratViewModel {
             }
         };
 
-        List<Contrat> contrats = getContratsParClient(clientId);
-        for (Contrat contrat : contrats) {
+        List<Contrat> contratList = getContratsParClient(clientId);
+        for (Contrat contrat : contratList) {
             Object[] row = {
                     contrat.getId(),
                     contrat.getNomContrat(),

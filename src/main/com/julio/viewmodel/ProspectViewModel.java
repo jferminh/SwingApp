@@ -12,11 +12,10 @@ import main.com.julio.service.UnicityService;
 import javax.swing.table.DefaultTableModel;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.logging.Logger;
 
 public class ProspectViewModel {
-    private ProspectRepository prospectRepo;
-    private UnicityService unicityService;
+    private final ProspectRepository prospectRepo;
+    private final UnicityService unicityService;
 
     public ProspectViewModel(ProspectRepository prospectRepo, UnicityService unicityService) {
         this.prospectRepo = prospectRepo;
@@ -24,19 +23,19 @@ public class ProspectViewModel {
     }
 
     public Prospect creerProspect(String raisonSociale,
-                         String numeroRue,
-                         String nomRue,
-                         String codePostal,
-                         String ville,
-                         String telephone,
-                         String email,
-                         String commentaires,
-                         LocalDate dateProspection,
-                         Interesse interesse
-    ){
+                                  String numeroRue,
+                                  String nomRue,
+                                  String codePostal,
+                                  String ville,
+                                  String telephone,
+                                  String email,
+                                  String commentaires,
+                                  LocalDate dateProspection,
+                                  Interesse interesse
+    ) throws ValidationException {
         try {
-            if (unicityService.isRaisonSocialeUnique(raisonSociale, -1)) {
-                throw new ValidationException("raisonSociale", "Cette raison sociale existe dèjà");
+            if (!unicityService.isRaisonSocialeUnique(raisonSociale, -1)) {
+                throw new ValidationException("Cette raison sociale existe dèjà");
             }
 
             Adresse adresse = new Adresse(numeroRue, nomRue, codePostal, ville);
@@ -53,7 +52,6 @@ public class ProspectViewModel {
 
             prospectRepo.add(prospect);
 
-            LoggingService.log("Prospect créé avec succès: " + raisonSociale);
             return prospect;
         } catch (Exception e) {
             LoggingService.logError("Erreur création prospect", e);
@@ -71,11 +69,10 @@ public class ProspectViewModel {
                                     String email,
                                     String commentaires,
                                     LocalDate dateProspection,
-                                    Interesse interesse
-    ){
+                                    Interesse interesse) throws ValidationException, NotFoundException {
         try {
-            if (unicityService.isRaisonSocialeUnique(raisonSociale, id)) {
-                throw new ValidationException("raisonSociale", "Cette raison sociale existe dèjà");
+            if (!unicityService.isRaisonSocialeUnique(raisonSociale, id)) {
+                throw new ValidationException("Cette raison sociale existe dèjà");
             }
 
             Prospect prospect = prospectRepo.findById(id);
@@ -95,32 +92,24 @@ public class ProspectViewModel {
             prospect.setDateProspection(dateProspection);
             prospect.setInteresse(interesse);
 
-            boolean success = prospectRepo.update(prospect);
-
-            if (success) {
-                LoggingService.log("Prospect modifié avec succès: ID= " + id);
-            }
-            return success;
+            return prospectRepo.update(prospect);
         } catch (Exception e) {
             LoggingService.logError("Erreur modification prospect", e);
             throw e;
         }
     }
 
-    public boolean supprimerProspect(int id){
+    public boolean supprimerProspect(int id) {
         try {
-            boolean success = prospectRepo.delete(id);
-            if (success) {
-                LoggingService.log("Prospect supprimé avec succès: ID= " + id);
-            }
-            return success;
+
+            return prospectRepo.delete(id);
         } catch (Exception e) {
             LoggingService.logError("Erreur suppression prospect", e);
             return false;
         }
     }
 
-    public Prospect getProspectById(int id){
+    public Prospect getProspectById(int id) {
         return prospectRepo.findById(id);
     }
 

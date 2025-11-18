@@ -12,13 +12,13 @@ public class Adresse {
     private String codePostal;
     private String ville;
 
-    public Adresse(String numeroRue, String nomRue, String codePostal, String ville) {
+    public Adresse(String numeroRue, String nomRue, String codePostal, String ville) throws ValidationException {
         this.id = compteurId++;
         setNumeroRue(numeroRue);
         setNomRue(nomRue);
         setCodePostal(codePostal);
         setVille(ville);
-        LoggingService.log("Adresse créé avec ID : " + this.id);
+//        LoggingService.log("Adresse créé avec ID : " + this.id);
     }
 
     public int getId() {
@@ -33,9 +33,9 @@ public class Adresse {
         return numeroRue;
     }
 
-    public void setNumeroRue(String numeroRue) {
+    public void setNumeroRue(String numeroRue) throws ValidationException {
         if (ValidationService.isNullOrEmpty(numeroRue)) {
-            throw new ValidationException("numeroRue", "Le numéro de rue est obligatoire");
+            throw new ValidationException("Le numéro de rue est obligatoire");
         }
         this.numeroRue = numeroRue;
     }
@@ -44,9 +44,9 @@ public class Adresse {
         return nomRue;
     }
 
-    public void setNomRue(String nomRue) {
+    public void setNomRue(String nomRue) throws ValidationException {
         if (ValidationService.isNullOrEmpty(nomRue)) {
-            throw new ValidationException("nomRue", "Le nome est obligatoire");
+            throw new ValidationException("Le nome est obligatoire");
         }
         this.nomRue = nomRue;
     }
@@ -55,9 +55,9 @@ public class Adresse {
         return codePostal;
     }
 
-    public void setCodePostal(String codePostal) {
+    public void setCodePostal(String codePostal) throws ValidationException {
         if (!ValidationService.isValidCodePostal(codePostal)) {
-            throw new ValidationException("codePostal", "Le code doit contenir exactement 5 chiffres");
+            throw new ValidationException("Le code doit contenir exactement 5 chiffres");
         }
         this.codePostal = codePostal;
     }
@@ -66,9 +66,9 @@ public class Adresse {
         return ville;
     }
 
-    public void setVille(String ville) {
+    public void setVille(String ville) throws ValidationException {
         if (ValidationService.isNullOrEmpty(ville)) {
-            throw new ValidationException("ville", "Le ville est obligatoire");
+            throw new ValidationException("Le ville est obligatoire");
         }
         this.ville = ville;
     }

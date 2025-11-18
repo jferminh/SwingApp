@@ -1,7 +1,6 @@
 package main.com.julio.model;
 
 import main.com.julio.exception.ValidationException;
-import main.com.julio.service.LoggingService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,12 +12,11 @@ public class Client extends Societe {
 
     public Client(String raisonSociale, Adresse adresse, String telephone,
                   String email, String commentaires, long chiffreAffaires,
-                  int nbEmployes) {
+                  int nbEmployes) throws ValidationException {
         super(raisonSociale, adresse, telephone, email, commentaires);
         setChiffreAffaires(chiffreAffaires);
         setNbEmployes(nbEmployes);
         this.contrats = new ArrayList<>();
-        LoggingService.log("Client " + this + " créé");
     }
 
     public long getChiffreAffaires() {
@@ -33,16 +31,16 @@ public class Client extends Societe {
         return new ArrayList<>(contrats);
     }
 
-    public void setChiffreAffaires(long chiffreAffaires) {
+    public void setChiffreAffaires(long chiffreAffaires) throws ValidationException {
         if (chiffreAffaires < 200) {
-            throw new ValidationException("chiffreAffaires", "Le chiffre d'affaires doit être >= 200.");
+            throw new ValidationException("Le chiffre d'affaires doit être >= 200.");
         }
         this.chiffreAffaires = chiffreAffaires;
     }
 
-    public void setNbEmployes(int nbEmployes) {
+    public void setNbEmployes(int nbEmployes) throws ValidationException {
         if (nbEmployes < 1) {
-            throw new ValidationException("nbEmployes", "Le nombre d'employés doit être >= 1");
+            throw new ValidationException("Le nombre d'employés doit être >= 1");
         }
         this.nbEmployes = nbEmployes;
     }
@@ -55,13 +53,11 @@ public class Client extends Societe {
         if (contrat != null && !contrats.contains(contrat)) {
             contrats.add(contrat);
         }
-        LoggingService.log("Contrat ajouté au client ID :" + getId());
     }
 
     public void supprimerContrat(Contrat contrat) {
-        if (contrats.remove(contrat)) {
-            LoggingService.log("Contrat supprimé de client ID : " + getId());
-        }
+        contrats.remove(contrat);
+
     }
 
 

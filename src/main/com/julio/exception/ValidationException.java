@@ -1,14 +1,14 @@
 package main.com.julio.exception;
 
-public class ValidationException extends RuntimeException {
-    private final String field;
+public class ValidationException extends Exception {
+//    private final String field;
 
-    public ValidationException(String field, String message) {
+    public ValidationException(String message) {
         super(message);
-        this.field = field;
+//        this.field = field;
     }
 
-    public String getField() {
-        return this.field;
-    }
+//    public String getField() {
+//        return this.field;
+//    }
 }

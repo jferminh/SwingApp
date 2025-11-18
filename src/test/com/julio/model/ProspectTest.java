@@ -23,7 +23,7 @@ class ProspectTest {
     private LocalDate dateProspectionParDefault;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws ValidationException {
         Adresse.resetCompteur();
         Societe.resetCompteur();
 
@@ -41,7 +41,7 @@ class ProspectTest {
 
         @Test
         @DisplayName("Création d'un prospect valide avec toutes les données")
-        void creationProspectValideComplet() {
+        void creationProspectValideComplet() throws ValidationException {
             String raisonSociale = "Société XYZ";
             String telephone = "0456789012";
             String email = "info@xyz.fr";
@@ -128,7 +128,7 @@ class ProspectTest {
 
         @Test
         @DisplayName("Format de date jj/MM/aaaa")
-        void testFormatDateProspection() {
+        void testFormatDateProspection() throws ValidationException {
             LocalDate date = LocalDate.of(2024, 3, 15);
             Prospect prospect = new Prospect("Société", adresseParDefault, "0456789012",
                     "test@test.fr", "", date, Interesse.NON);

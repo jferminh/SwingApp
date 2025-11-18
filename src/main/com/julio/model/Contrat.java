@@ -1,7 +1,6 @@
 package main.com.julio.model;
 
 import main.com.julio.exception.ValidationException;
-import main.com.julio.service.LoggingService;
 import main.com.julio.service.ValidationService;
 
 public class Contrat {
@@ -12,12 +11,11 @@ public class Contrat {
     private String nomContrat;
     private double montant;
 
-    public Contrat(int clientId, String nomContrat, double montant) {
+    public Contrat(int clientId, String nomContrat, double montant) throws ValidationException {
         this.id = compteurId++;
         setClientId(clientId);
         setNomContrat(nomContrat);
         setMontant(montant);
-        LoggingService.log("Contrat créé avec ID: " + this.id);
     }
 
     public int getId() {
@@ -32,9 +30,9 @@ public class Contrat {
         return clientId;
     }
 
-    public void setClientId(int clientId) {
+    public void setClientId(int clientId) throws ValidationException {
         if (clientId <= 0) {
-            throw new ValidationException("clientId","L'ID du client est obligatoire.");
+            throw new ValidationException("L'ID du client est obligatoire.");
         }
         this.clientId = clientId;
     }
@@ -43,9 +41,9 @@ public class Contrat {
         return nomContrat;
     }
 
-    public void setNomContrat(String nomContrat) {
+    public void setNomContrat(String nomContrat) throws ValidationException {
         if (ValidationService.isNullOrEmpty(nomContrat)) {
-            throw new ValidationException("nomContrat", "Le nom du client est obligatoire.");
+            throw new ValidationException("Le nom du client est obligatoire.");
         }
         this.nomContrat = nomContrat;
     }
@@ -54,18 +52,18 @@ public class Contrat {
         return montant;
     }
 
-    public void setMontant(double montant) {
+    public void setMontant(double montant) throws ValidationException {
         if (montant <= 0) {
-            throw new ValidationException("montant", "Le montant doit être positif.");
+            throw new ValidationException("Le montant doit être positif.");
         }
         this.montant = montant;
     }
 
-    public static void resetCompteur(){
-        compteurId = 1;
-    }
+//    public static void resetCompteur() {
+//        compteurId = 1;
+//    }
 
-    public String toString(){
+    public String toString() {
         return nomContrat + " (" + montant + "€)";
     }
 }

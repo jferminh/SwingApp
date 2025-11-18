@@ -1,12 +1,13 @@
 package main.com.julio.service;
 
 import main.com.julio.model.Client;
+import main.com.julio.model.Prospect;
 import main.com.julio.repository.ClientRepository;
 import main.com.julio.repository.ProspectRepository;
 
 public class UnicityService {
-    private ClientRepository clientRepo;
-    private ProspectRepository prospectRepo;
+    private final ClientRepository clientRepo;
+    private final ProspectRepository prospectRepo;
 
     public UnicityService(ClientRepository clientRepo, ProspectRepository prospectRepo) {
         this.clientRepo = clientRepo;
@@ -14,12 +15,18 @@ public class UnicityService {
     }
 
     public boolean isRaisonSocialeUnique(String raisonSociale, int idExcluire) {
+        for (Prospect prospect : prospectRepo.findAll()) {
+            if (prospect.getId() != idExcluire && prospect.getRaisonSociale().equalsIgnoreCase(raisonSociale)) {
+                return false;
+            }
+        }
         for (Client client : clientRepo.findAll()) {
             if (client.getId() != idExcluire && client.getRaisonSociale().equalsIgnoreCase(raisonSociale)) {
                 return false;
 
             }
         }
+
         return true;
     }
 }

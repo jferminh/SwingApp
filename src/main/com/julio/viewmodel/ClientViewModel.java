@@ -13,9 +13,9 @@ import javax.swing.table.DefaultTableModel;
 import java.util.List;
 
 public class ClientViewModel {
-    private ClientRepository clientRepo;
-    private ContratRepository contratRepo;
-    private UnicityService unicityService;
+    public ClientRepository clientRepo;
+    private final ContratRepository contratRepo;
+    private final UnicityService unicityService;
 
     public ClientViewModel(ClientRepository clientRepo,
                            ContratRepository contratRepo,
@@ -34,10 +34,10 @@ public class ClientViewModel {
                               String email,
                               String commentaires,
                               long chiffreAffaires,
-                              int nbEmployes){
+                              int nbEmployes) throws ValidationException, NotFoundException {
         try {
             if (!unicityService.isRaisonSocialeUnique(raisonSociale, -1)) {
-                throw new ValidationException("raisonSociale","Cette raison sociale existe déjà");
+                throw new ValidationException("Cette raison sociale existe déjà");
             }
 
             Adresse adresse = new Adresse(numeroRue, nomRue, codePostal, ville);
@@ -46,7 +46,6 @@ public class ClientViewModel {
                     telephone, email, commentaires, chiffreAffaires, nbEmployes);
 
             clientRepo.add(client);
-            LoggingService.log("Client créé avec succès: " + raisonSociale);
             return client;
         } catch (Exception e) {
             LoggingService.logError("Erreur création client", e);
@@ -55,19 +54,19 @@ public class ClientViewModel {
     }
 
     public boolean modifierClient(int id,
-                          String raisonSociale,
-                          String numeroRue,
-                          String nomRue,
-                          String codePostal,
-                          String ville,
-                          String telephone,
-                          String email,
-                          String commentaires,
-                          long chiffreAffaires,
-                          int nbEmployes){
+                                  String raisonSociale,
+                                  String numeroRue,
+                                  String nomRue,
+                                  String codePostal,
+                                  String ville,
+                                  String telephone,
+                                  String email,
+                                  String commentaires,
+                                  long chiffreAffaires,
+                                  int nbEmployes) throws ValidationException, NotFoundException {
         try {
             if (!unicityService.isRaisonSocialeUnique(raisonSociale, id)) {
-                throw new ValidationException("raisonSociale","Cette raison sociale existe dèjà");
+                throw new ValidationException("Cette raison sociale existe dèjà");
             }
             Client client = clientRepo.findById(id);
             if (client == null) {
@@ -86,43 +85,35 @@ public class ClientViewModel {
             client.setChiffreAffaires(chiffreAffaires);
             client.setNbEmployes(nbEmployes);
 
-            boolean success = clientRepo.update(client);
-            if (success) {
-                LoggingService.log("Client modifié avec succès: ID= " + id);
-            }
-            return success;
+            return clientRepo.update(client);
         } catch (Exception e) {
             LoggingService.logError("Erreur modification client", e);
             throw e;
         }
     }
 
-    public boolean supprimerClient(int id){
+    public boolean supprimerClient(int id) {
         try {
             contratRepo.findByClientId(id).forEach(c -> {
                 contratRepo.delete(c.getId());
             });
 
-            boolean success = clientRepo.delete(id);
-            if (success) {
-                LoggingService.log("Client supprimé avec succès: ID= " + id);
-            }
-            return success;
+            return clientRepo.delete(id);
         } catch (Exception e) {
             LoggingService.logError("Erreur suppression client", e);
-            return  false;
+            return false;
         }
     }
 
-    public Client getClientById(int id){
+    public Client getClientById(int id) {
         return clientRepo.findById(id);
     }
 
-    public List<Client> getTousLesClients(){
+    public List<Client> getTousLesClients() {
         return clientRepo.findAll();
     }
 
-    public DefaultTableModel construireTableModel(){
+    public DefaultTableModel construireTableModel() {
         String[] colonnes = {"ID", "Raison Sociale", "Adresse", "Téléphone",
                 "Email", "CA (€)", "Nb Employés"};
         DefaultTableModel model = new DefaultTableModel(colonnes, 0) {

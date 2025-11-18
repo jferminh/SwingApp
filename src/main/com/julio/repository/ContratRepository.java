@@ -1,7 +1,6 @@
 package main.com.julio.repository;
 
 import main.com.julio.model.Contrat;
-import main.com.julio.service.LoggingService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,14 +15,12 @@ public class ContratRepository {
 
     public void add(Contrat contrat) {
         this.contrats.add(contrat);
-        LoggingService.log("Contrat ajouté: ID=" + contrat.getId());
     }
 
     public boolean update(Contrat contrat) {
         for (int i = 0; i < this.contrats.size(); i++) {
             if (this.contrats.get(i).getId() == contrat.getId()) {
                 this.contrats.set(i, contrat);
-                LoggingService.log("Contrat mis à jour: ID=" + contrat.getId());
                 return true;
             }
         }
@@ -31,11 +28,8 @@ public class ContratRepository {
     }
 
     public boolean delete(int id) {
-        boolean removed = contrats.removeIf(contrat -> contrat.getId() == id);
-        if (removed) {
-            LoggingService.log("Contrat supprimé: ID=" + id);
-        }
-        return removed;
+
+        return contrats.removeIf(contrat -> contrat.getId() == id);
     }
 
     public Contrat findById(int id) {

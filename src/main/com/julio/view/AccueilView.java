@@ -1,4 +1,310 @@
 package main.com.julio.view;
 
-public class AccueilView {
+import main.com.julio.model.Client;
+import main.com.julio.model.Interesse;
+import main.com.julio.model.Prospect;
+import main.com.julio.viewmodel.ClientViewModel;
+import main.com.julio.viewmodel.ProspectViewModel;
+
+import javax.swing.*;
+import java.awt.*;
+import java.util.List;
+
+public class AccueilView extends JFrame {
+    private ClientViewModel clientVM;
+    private ProspectViewModel prospectVM;
+
+    private JRadioButton rbClients;
+    private JRadioButton rbProspects;
+
+    private JButton btnVoirContrats;
+
+    private JPanel selectPanel;
+    private JLabel selectLabel;
+    private JComboBox<Object> comboSelect;
+
+    private String currentAction = null;
+    private final String origin = "accueil";
+
+    public AccueilView(ClientViewModel clientVM, ProspectViewModel prospectVM) {
+        this.clientVM = clientVM;
+        this.prospectVM = prospectVM;
+
+        initComponents();
+    }
+
+    private void initComponents() {
+        setTitle("Gestion Clients-Prospects - Accueil");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(900, 520);
+        setLocationRelativeTo(null);
+        setResizable(false);
+
+        JPanel mainPanel = new JPanel(new BorderLayout(12, 12));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+
+        JLabel titre = new JLabel("Gestion des entités : Clients /  Prospects");
+        titre.setFont(new Font("Arial", Font.BOLD, 20));
+        mainPanel.add(titre, BorderLayout.NORTH);
+
+        JPanel centerPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(8, 8, 8, 8);
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1.0;
+
+        rbClients = new JRadioButton("Clients");
+        rbProspects = new JRadioButton("Prospects");
+        rbClients.setSelected(true);
+        ButtonGroup group = new ButtonGroup();
+        group.add(rbClients);
+        group.add(rbProspects);
+
+        JPanel radios = new JPanel(new FlowLayout(FlowLayout.LEFT, 40, 0));
+        radios.add(rbClients);
+        radios.add(rbProspects);
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        centerPanel.add(new JLabel("Sélectionnez le type d'entité : "), gbc);
+        gbc.gridy = 1;
+        centerPanel.add(radios, gbc);
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+        JButton btnCreer = new JButton("Créer");
+        JButton btnModifier = new JButton("Modifier");
+        JButton btnSupprimer = new JButton("Supprimer");
+        btnVoirContrats = new JButton("Voir Contrats");
+        JButton btnAfficher = new JButton("Afficher");
+        JButton btnQuitter = new JButton("Quitter");
+
+        Dimension btnSize = new Dimension(140, 36);
+        for (JButton b : new JButton[]{btnCreer, btnModifier, btnSupprimer, btnVoirContrats, btnAfficher}) {
+            b.setPreferredSize(btnSize);
+            actions.add(b);
+        }
+
+        gbc.gridy = 2;
+        centerPanel.add(actions, gbc);
+
+        selectPanel = new JPanel(new GridBagLayout());
+        selectPanel.setBorder(BorderFactory.createTitledBorder("Sélectionnez une société :"));
+
+        GridBagConstraints gs = new GridBagConstraints();
+        gs.insets = new Insets(8, 8, 8, 8);
+        gs.anchor = GridBagConstraints.WEST;
+
+        comboSelect = new JComboBox<>();
+        comboSelect.setPreferredSize(new Dimension(420, 28));
+        gs.gridy = 1;
+        gs.gridy = 0;
+        gs.weightx = 0;
+        gs.fill = GridBagConstraints.HORIZONTAL;
+        selectPanel.add(comboSelect, gs);
+
+        JPanel buttonSelect = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        JButton btnValider = new JButton("Valider");
+        JButton btnAnnuler = new JButton("Annuler");
+        buttonSelect.add(btnValider);
+        buttonSelect.add(btnAnnuler);
+
+        gs.gridx = 0;
+        gs.gridy = 1;
+        gs.gridwidth = 2;
+        gs.weightx = 0;
+        gs.fill = GridBagConstraints.NONE;
+        selectPanel.add(buttonSelect, gs);
+
+        gbc.gridy = 3;
+
+        centerPanel.add(selectPanel, gbc);
+        mainPanel.add(centerPanel, BorderLayout.CENTER);
+
+        JPanel bottonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        bottonPanel.add(btnQuitter);
+        mainPanel.add(bottonPanel, BorderLayout.SOUTH);
+
+        setSelectPanelVisible(false);
+
+        // Listeners
+        rbClients.addActionListener(e -> updateVoirContratsEnabled());
+        rbProspects.addActionListener(e -> updateVoirContratsEnabled());
+        updateVoirContratsEnabled();
+
+        btnCreer.addActionListener(e -> onCreer());
+        btnModifier.addActionListener(e -> {
+            actions.setVisible(false);
+            prepareSelection("modifier");
+        });
+        btnSupprimer.addActionListener(e -> {
+            actions.setVisible(false);
+            prepareSelection("supprimer");
+        });
+        btnVoirContrats.addActionListener(e -> {
+            actions.setVisible(false);
+            prepareSelection("voirContrats");
+        });
+        btnAfficher.addActionListener(e -> {
+            if (isClientSelected()) ouvrirGestionClients();
+            else ouvrirGestionProspects();
+        });
+        btnQuitter.addActionListener(e -> System.exit(0));
+
+        btnValider.addActionListener(e -> onValiderSelection());
+        btnAnnuler.addActionListener(e -> {
+            actions.setVisible(true);
+            cancelSelection();
+        });
+
+        setContentPane(mainPanel);
+
+    }
+
+    private void updateVoirContratsEnabled() {
+        btnVoirContrats.setEnabled(rbClients.isSelected());
+    }
+
+    private void setSelectPanelVisible(boolean visible) {
+        selectPanel.setVisible(visible);
+        selectPanel.revalidate();
+        selectPanel.repaint();
+    }
+
+    private boolean isClientSelected() {
+        return rbClients.isSelected();
+    }
+
+    private void onCreer() {
+        boolean clients = isClientSelected();
+        Integer id = null;
+        FormulaireView form = new FormulaireView(clientVM, prospectVM, clients, id, "Créer", origin);
+        form.setVisible(true);
+        this.dispose();
+    }
+
+    private void prepareSelection(String action) {
+        this.currentAction = action;
+        comboSelect.removeAllItems();
+
+        if (isClientSelected()) {
+            List<Client> clients = clientVM.getTousLesClients();
+            if (clients.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Aucun client disponible",
+                        "Info", JOptionPane.INFORMATION_MESSAGE);
+                this.currentAction = null;
+                setSelectPanelVisible(false);
+                return;
+            }
+            for (Client c : clients) {
+                comboSelect.addItem(c);
+            }
+        } else {
+            List<Prospect> prospects = prospectVM.getTousLesProspects();
+            if (prospects.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Aucun prospect disponible.",
+                        "Info", JOptionPane.INFORMATION_MESSAGE);
+                this.currentAction = null;
+                setSelectPanelVisible(false);
+                return;
+            }
+            for (Prospect p : prospects) {
+                comboSelect.addItem(p);
+            }
+
+        }
+
+        comboSelect.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value,
+                                                          int index, boolean isSelected,
+                                                          boolean cellHasFocus) {
+                Component c = super.getListCellRendererComponent(list, value, index,
+                        isSelected, cellHasFocus);
+                if (value instanceof Client cli) {
+                    setText(cli.getRaisonSociale() + " (ID " + cli.getId() + ")");
+                } else if (value instanceof Prospect pro) {
+                    setText(pro.getRaisonSociale() + " (ID " + pro.getId() + ")");
+
+                }
+                return c;
+            }
+        });
+        setSelectPanelVisible(true);
+    }
+
+    private void cancelSelection() {
+        this.currentAction = null;
+        setSelectPanelVisible(false);
+    }
+
+    private void onValiderSelection() {
+        if (currentAction == null) {
+            setSelectPanelVisible(false);
+            return;
+        }
+        Object selected = comboSelect.getSelectedItem();
+        if (selected == null) {
+            JOptionPane.showMessageDialog(this,
+                    "Veuillez sélectionner un élément.",
+                    "Info", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        switch (currentAction) {
+            case "modifier" -> handleModifier(selected);
+            case "supprimer" -> handleSupprimer(selected);
+            case "voirContrats" -> handleVoirContrats(selected);
+            default -> {}
+        }
+
+        cancelSelection();
+    }
+
+    private void handleModifier(Object selected) {
+        if (selected instanceof Client c) {
+            FormulaireView form = new FormulaireView(clientVM, prospectVM, true, c.getId(), "Modifier", origin);
+            form.setVisible(true);
+            this.dispose();
+        } else if (selected instanceof Prospect p) {
+            FormulaireView form = new FormulaireView(clientVM, prospectVM, false, p.getId(), "Modifier", origin);
+            form.setVisible(true);
+            this.dispose();
+        }
+    }
+
+    private void handleSupprimer(Object selected) {
+        if (selected instanceof Client c) {
+            FormulaireView form = new FormulaireView(clientVM, prospectVM, true, c.getId(), "Supprimer", origin);
+            form.setVisible(true);
+            this.dispose();
+        } else if (selected instanceof Prospect p) {
+            FormulaireView form = new FormulaireView(clientVM, prospectVM, false, p.getId(), "Supprimer", origin);
+            form.setVisible(true);
+            this.dispose();
+        }
+    }
+
+    private void handleVoirContrats(Object selected) {
+        if (!(selected instanceof Client c)) {
+            JOptionPane.showMessageDialog(this,
+                    "La visualisation des contrats n'est disponible que pour les clients.",
+                    "Info", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        ListeContratsView contratsView = new ListeContratsView(clientVM, prospectVM, c, origin);
+        contratsView.setVisible(true);
+        this.dispose();
+    }
+
+    private void ouvrirGestionClients() {
+        ListeView listeClients = new ListeView(clientVM, prospectVM, true);
+        listeClients.setVisible(true);
+        this.dispose();
+    }
+
+    private void ouvrirGestionProspects() {
+        ListeView listeProspects = new ListeView(clientVM, prospectVM, false);
+        listeProspects.setVisible(true);
+        this.dispose();
+    }
 }

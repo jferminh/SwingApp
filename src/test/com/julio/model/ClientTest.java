@@ -16,7 +16,7 @@ class ClientTest {
     private Adresse adresseParDefault;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws ValidationException{
         // Réinitialiser les compteurs avant chaque test
         Adresse.resetCompteur();
         Societe.resetCompteur();
@@ -41,7 +41,7 @@ class ClientTest {
 
         @Test
         @DisplayName("Création d'un client valide avec toutes les données")
-        void creationClientValidComplet() {
+        void creationClientValidComplet() throws ValidationException {
             String raisonSociale = "Entreprise ABC";
             String telephone = "0123456789";
             String email = "contact@abc.fr";
@@ -69,7 +69,7 @@ class ClientTest {
 
         @Test
         @DisplayName("Création d'un client sans commentaires (optionnel)")
-        void creationClientSansCommentaires() {
+        void creationClientSansCommentaires() throws  ValidationException {
             Client client = new Client("Entreprise Test", adresseParDefault,
                     "0123456789", "test@test.fr", "", 1000, 10);
 

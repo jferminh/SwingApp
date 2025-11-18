@@ -1,9 +1,8 @@
 package main.com.julio.repository;
 
+import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Adresse;
 import main.com.julio.model.Client;
-import main.com.julio.model.Contrat;
-import main.com.julio.service.LoggingService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,7 +11,7 @@ import java.util.stream.Collectors;
 public class ClientRepository {
     public List<Client> clients;
 
-    public ClientRepository() {
+    public ClientRepository() throws ValidationException {
         this.clients = new ArrayList<>();
         initialiserDonneesDemo();
     }
@@ -27,14 +26,12 @@ public class ClientRepository {
 
     public void add(Client client) {
         this.clients.add(client);
-        LoggingService.log("Client ajouté: ID= " + client.getId());
     }
 
     public boolean update(Client client) {
         for (int i = 0; i < this.clients.size(); i++) {
             if (this.clients.get(i).getId() == client.getId()) {
                 this.clients.set(i, client);
-                LoggingService.log("Client mis à jour: ID= " + client.getId());
                 return true;
             }
         }
@@ -42,11 +39,8 @@ public class ClientRepository {
     }
 
     public boolean delete(int id) {
-        boolean removed = clients.removeIf(client -> client.getId() == id);
-        if (removed) {
-            LoggingService.log("Client supprimé: ID= " + id);
-        }
-        return removed;
+
+        return clients.removeIf(client -> client.getId() == id);
     }
 
     public Client findById(int id) {
@@ -63,7 +57,7 @@ public class ClientRepository {
                 .collect(Collectors.toList());
     }
 
-    public void initialiserDonneesDemo() {
+    public void initialiserDonneesDemo() throws ValidationException {
         Adresse adresse1 = new Adresse(
                 "10",
                 "Victor Hugo",
@@ -82,7 +76,6 @@ public class ClientRepository {
                 "54390",
                 "Frouard"
         );
-//        Contrat contrat1 = new Contrat("1","Mega", 50000);
         clients.add(new Client(
                 "IBM",
                 adresse1,
