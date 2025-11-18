@@ -4,7 +4,7 @@ import main.com.julio.exception.ValidationException;
 import main.com.julio.service.ValidationService;
 
 public abstract class Societe {
-    private static int compteurId = 1;
+//    private static int compteurId = 1;
     private int id;
     private String raisonSociale;
     private Adresse adresse;
@@ -12,9 +12,10 @@ public abstract class Societe {
     private String email;
     private String commentaires;
 
-    public Societe(String raisonSociale, Adresse adresse, String telephone,
+    public Societe(int id, String raisonSociale, Adresse adresse, String telephone,
                    String email, String commentaires) throws ValidationException {
-        this.id = compteurId++;
+//        this.id = compteurId++;
+        this.id = id;
         setRaisonSociale(raisonSociale);
         setAdresse(adresse);
         setTelephone(telephone);
@@ -84,7 +85,7 @@ public abstract class Societe {
 
     public abstract String getTypeSociete();
 
-    public static void resetCompteur() {
-        compteurId = 1;
-    }
+//    public static void resetCompteur() {
+//        compteurId = 1;
+//    }
 }

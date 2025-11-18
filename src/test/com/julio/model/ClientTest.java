@@ -19,7 +19,7 @@ class ClientTest {
     void setUp() throws ValidationException{
         // Réinitialiser les compteurs avant chaque test
         Adresse.resetCompteur();
-        Societe.resetCompteur();
+        Client.resetCompteur();
 
         // Créer une adresse par défault réutilisable
         adresseParDefault = new Adresse("10", "Rue de Nancy", "54390", "Frouard");

@@ -46,7 +46,7 @@ public class Adresse {
 
     public void setNomRue(String nomRue) throws ValidationException {
         if (ValidationService.isNullOrEmpty(nomRue)) {
-            throw new ValidationException("Le nome est obligatoire");
+            throw new ValidationException("Le nom de rue est obligatoire");
         }
         this.nomRue = nomRue;
     }
@@ -57,7 +57,7 @@ public class Adresse {
 
     public void setCodePostal(String codePostal) throws ValidationException {
         if (!ValidationService.isValidCodePostal(codePostal)) {
-            throw new ValidationException("Le code doit contenir exactement 5 chiffres");
+            throw new ValidationException("Le code postal doit contenir exactement 5 chiffres");
         }
         this.codePostal = codePostal;
     }

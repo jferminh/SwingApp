@@ -34,6 +34,8 @@ public class ContratViewModel {
             client.ajouterContrat(contrat);
 
             return contrat;
+        } catch (ValidationException ve) {
+            throw ve;
         } catch (Exception e) {
             LoggingService.logError("Erreur création contrat", e);
             throw e;

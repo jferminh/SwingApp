@@ -1,5 +1,6 @@
 package main.com.julio.view;
 
+import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Client;
 import main.com.julio.repository.ContratRepository;
 import main.com.julio.viewmodel.ClientViewModel;
@@ -88,7 +89,7 @@ public class ListeContratsView extends JFrame {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
 
         JButton btnCreer = new JButton("Créer Contrat");
-        btnCreer.setPreferredSize(new Dimension(140, 35));
+        btnCreer.setPreferredSize(new Dimension(120, 35));
         btnCreer.addActionListener(e -> creerContrat());
         buttonPanel.add(btnCreer);
 
@@ -102,10 +103,15 @@ public class ListeContratsView extends JFrame {
         btnSupprimer.addActionListener(e -> supprimerContrat());
         buttonPanel.add(btnSupprimer);
 
-        JButton btnFermer = new JButton("Fermer");
+        JButton btnFermer = new JButton("Retourner");
         btnFermer.setPreferredSize(new Dimension(120, 35));
         btnFermer.addActionListener(e -> retour());
         buttonPanel.add(btnFermer);
+
+        JButton btnQuitter = new JButton("Quitter");
+        btnQuitter.setPreferredSize(new Dimension(120, 35));
+        btnQuitter.addActionListener(e -> System.exit(0));
+        buttonPanel.add(btnQuitter);
 
         mainPanel.add(buttonPanel, BorderLayout.SOUTH);
 
@@ -140,6 +146,13 @@ public class ListeContratsView extends JFrame {
                         "Succès", JOptionPane.INFORMATION_MESSAGE);
                 chargerDonnees();
 
+            } catch (ValidationException ve) {
+                JOptionPane.showMessageDialog(this, ve.getMessage(),
+                        "Erreur d'entrée", JOptionPane.ERROR_MESSAGE);
+            } catch (NumberFormatException nfe) {
+                JOptionPane.showMessageDialog(this,
+                        "Erreur de format numérique. Vérifiez vos saisies.",
+                        "Erreur d'entrée", JOptionPane.ERROR_MESSAGE);
             } catch (Exception e) {
                 JOptionPane.showMessageDialog(this, "Erreur : " + e.getMessage(),
                         "Erreur", JOptionPane.ERROR_MESSAGE);
@@ -181,6 +194,12 @@ public class ListeContratsView extends JFrame {
                         "Succès", JOptionPane.INFORMATION_MESSAGE);
                 chargerDonnees();
 
+            } catch (ValidationException ve) {
+                JOptionPane.showMessageDialog(this, ve.getMessage(),
+                        "Erreur d'entrée", JOptionPane.ERROR_MESSAGE);
+            } catch (NumberFormatException nfe) {
+                JOptionPane.showMessageDialog(this, "Veuillez saisir des chiffres.",
+                        "Erreur d'entrée", JOptionPane.ERROR_MESSAGE);
             } catch (Exception e) {
                 JOptionPane.showMessageDialog(this, "Erreur : " + e.getMessage(),
                         "Erreur", JOptionPane.ERROR_MESSAGE);
@@ -218,14 +237,23 @@ public class ListeContratsView extends JFrame {
     }
 
     private void retour() {
-        if (origin.equals("accueil")) {
-            AccueilView accueilView = new AccueilView(clientVM, prospectVM);
-            accueilView.setVisible(true);
-            this.dispose();
-        } else {
-            ListeView listeView = new ListeView(clientVM, prospectVM, true);
-            listeView.setVisible(true);
-            this.dispose();
+        switch (origin) {
+            case "accueil" -> {
+                AccueilView accueilView = new AccueilView(clientVM, prospectVM);
+                accueilView.setVisible(true);
+                this.dispose();
+            }
+            case "listeview" -> {
+                ListeView listeView = new ListeView(clientVM, prospectVM, true);
+                listeView.setVisible(true);
+                this.dispose();
+            }
+            default -> {
+                FormulaireView formulaireView = new FormulaireView(clientVM, prospectVM,
+                        true, client.getId(), "Modifier", "accueil");
+                formulaireView.setVisible(true);
+                this.dispose();
+            }
         }
     }
 }

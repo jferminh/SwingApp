@@ -6,13 +6,14 @@ import main.com.julio.util.DateUtils;
 import java.time.LocalDate;
 
 public class Prospect extends Societe {
+    private static int compteurId = 1;
     private LocalDate dateProspection;
     private Interesse interesse;
 
     public Prospect(String raisonSociale, Adresse adresse, String telephone,
                     String email, String commentaires, LocalDate dateProspection,
                     Interesse interesse) throws ValidationException {
-        super(raisonSociale, adresse, telephone, email, commentaires);
+        super(compteurId++, raisonSociale, adresse, telephone, email, commentaires);
         setDateProspection(dateProspection);
         setInteresse(interesse);
     }
@@ -51,5 +52,9 @@ public class Prospect extends Societe {
     @Override
     public String toString() {
         return getTypeSociete() + " (Prospect)";
+    }
+
+    public static void resetCompteur(){
+        compteurId = 1;
     }
 }

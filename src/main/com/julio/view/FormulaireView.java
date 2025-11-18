@@ -5,12 +5,14 @@ import main.com.julio.model.Client;
 import main.com.julio.model.Interesse;
 import main.com.julio.model.Prospect;
 import main.com.julio.util.DateUtils;
+import main.com.julio.util.DisplayDialog;
 import main.com.julio.viewmodel.ClientViewModel;
 import main.com.julio.viewmodel.ProspectViewModel;
 
 import javax.swing.*;
 import javax.swing.text.html.ListView;
 import java.awt.*;
+import java.time.DateTimeException;
 import java.time.LocalDate;
 
 public class FormulaireView extends JFrame {
@@ -57,7 +59,7 @@ public class FormulaireView extends JFrame {
         }
     }
 
-    private void initialiserInterface() {
+   private void initialiserInterface() {
         String type = isClient ? "Client" : "Prospect";
         setTitle(action + " un " + type);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -185,35 +187,51 @@ public class FormulaireView extends JFrame {
                 cmbInteresse.setEnabled(false);
             }
             btnSauvegarder.setText("Supprimer");
-            btnSauvegarder.setPreferredSize(new Dimension(130, 35));
+            btnSauvegarder.setPreferredSize(new Dimension(100, 28));
             btnSauvegarder.addActionListener(e -> supprimer());
 
         } else {
             btnSauvegarder.setText("Sauvegarder");
-            btnSauvegarder.setPreferredSize(new Dimension(130, 35));
+            btnSauvegarder.setPreferredSize(new Dimension(100, 28));
             btnSauvegarder.addActionListener(e -> {
                 try {
                     sauvegarder();
                 } catch (ValidationException ve) {
-                    JOptionPane.showMessageDialog(this,
-                            "Erreur d'entrée : " + ve.getMessage(),
-                            "Erreur", JOptionPane.ERROR_MESSAGE);
+                    DisplayDialog.messageError("Erreur d'entrée", ve.getMessage());
+
                 } catch (NumberFormatException nfe) {
-                    JOptionPane.showMessageDialog(this,
-                            "Erreur de format numérique. Vérifiez vos saisies.",
-                            "Erreur", JOptionPane.ERROR_MESSAGE);
+                    DisplayDialog.messageError(
+                            "Erreur d'entrée",
+                            "Erreur de format numérique. Vérifiez vos saisies."
+                    );
+
+                } catch (DateTimeException dte) {
+                    DisplayDialog.messageError(
+                            "Erreur d'entrée",
+                            "La date n'a pas le format jj/MM/aaaa"
+                    );
                 } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(this,
-                            "Erreur : " + ex.getMessage(),
-                            "Erreur", JOptionPane.ERROR_MESSAGE);
+                    DisplayDialog.messageError("Erreur", ex.getMessage());
+
                 }
             });
         }
         buttonPanel.add(btnSauvegarder);
+        if (isClient && action.equals("Modifier")) {
+            JButton btnVoirContrats = new JButton("Voir Contrats");
+            btnVoirContrats.setPreferredSize(new Dimension(110, 28));
+            btnVoirContrats.addActionListener(e -> voirContrats());
+            buttonPanel.add(btnVoirContrats);
+        }
         JButton btnAnnuler = new JButton("Annuler");
-        btnAnnuler.setPreferredSize(new Dimension(130, 35));
+        btnAnnuler.setPreferredSize(new Dimension(100, 28));
         btnAnnuler.addActionListener(e -> retour());
         buttonPanel.add(btnAnnuler);
+
+        JButton btnQuitter = new JButton("Quitter");
+        btnQuitter.setPreferredSize(new Dimension(100, 28));
+        btnQuitter.addActionListener(e -> System.exit(0));
+        buttonPanel.add(btnQuitter);
 
         gbc.gridx = 0;
         gbc.gridy = row;
@@ -223,6 +241,13 @@ public class FormulaireView extends JFrame {
         // Scroll pane pour le formulaire complet
         JScrollPane scrollPane = new JScrollPane(mainPanel);
         add(scrollPane);
+    }
+
+    private void voirContrats() {
+        Client client = clientVM.getClientById(entityId);
+        ListeContratsView contratsView = new ListeContratsView(clientVM, prospectVM, client, "formulaireview");
+        contratsView.setVisible(true);
+        this.dispose();
     }
 
 
@@ -279,26 +304,23 @@ public class FormulaireView extends JFrame {
         if (confirm == JOptionPane.YES_OPTION) {
             boolean success = isClient ? clientVM.supprimerClient(entityId) : prospectVM.supprimerProspect(entityId);
             if (success) {
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Suppression réussie",
-                        "Succèss", JOptionPane.INFORMATION_MESSAGE
+                DisplayDialog.messageInfo(
+                        "Succèss",
+                        "Suppression réussie"
                 );
                 chargerDonnees();
             } else {
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Erreur lors de la suppression",
-                        "Erreur", JOptionPane.ERROR_MESSAGE
+                DisplayDialog.messageError(
+                        "Erreur",
+                        "Erreur lors de la suppression"
                 );
+
             }
         }
         retour();
     }
 
     private void sauvegarder() throws ValidationException {
-//        try {
-        // Récupérer les valeurs communes
         String raisonSociale = txtRaisonSociale.getText().trim();
         String numeroRue = txtNumeroRue.getText().trim();
         String nomRue = txtNomRue.getText().trim();
@@ -318,15 +340,19 @@ public class FormulaireView extends JFrame {
                 clientVM.creerClient(raisonSociale, numeroRue, nomRue, codePostal,
                         ville, telephone, email, commentaires,
                         chiffreAffaires, nbEmployes);
-                JOptionPane.showMessageDialog(this, "Client créé avec succès!",
-                        "Succès", JOptionPane.INFORMATION_MESSAGE);
+                DisplayDialog.messageInfo(
+                        "Succès",
+                        "Client créé avec succès"
+                );
             } else {
                 // Modification
                 clientVM.modifierClient(entityId, raisonSociale, numeroRue, nomRue,
                         codePostal, ville, telephone, email, commentaires,
                         chiffreAffaires, nbEmployes);
-                JOptionPane.showMessageDialog(this, "Client modifié avec succès!",
-                        "Succès", JOptionPane.INFORMATION_MESSAGE);
+                DisplayDialog.messageInfo(
+                        "Succès",
+                        "Client modifié avec succès"
+                );
             }
         } else {
             // Valider et parser les champs spécifiques Prospect
@@ -338,15 +364,20 @@ public class FormulaireView extends JFrame {
                 prospectVM.creerProspect(raisonSociale, numeroRue, nomRue, codePostal,
                         ville, telephone, email, commentaires,
                         dateProspection, interesse);
-                JOptionPane.showMessageDialog(this, "Prospect créé avec succès!",
-                        "Succès", JOptionPane.INFORMATION_MESSAGE);
+                DisplayDialog.messageInfo(
+                        "Succès",
+                        "Prospect créé avec succès!"
+                );
+
             } else {
                 // Modification
                 prospectVM.modifierProspect(entityId, raisonSociale, numeroRue, nomRue,
                         codePostal, ville, telephone, email, commentaires,
                         dateProspection, interesse);
-                JOptionPane.showMessageDialog(this, "Prospect modifié avec succès!",
-                        "Succès", JOptionPane.INFORMATION_MESSAGE);
+                DisplayDialog.messageInfo(
+                        "Succès",
+                        "Prospect modifié avec succès!"
+                );
             }
         }
 

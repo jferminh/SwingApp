@@ -43,7 +43,7 @@ public class Contrat {
 
     public void setNomContrat(String nomContrat) throws ValidationException {
         if (ValidationService.isNullOrEmpty(nomContrat)) {
-            throw new ValidationException("Le nom du client est obligatoire.");
+            throw new ValidationException("Le nom du contrat est obligatoire.");
         }
         this.nomContrat = nomContrat;
     }

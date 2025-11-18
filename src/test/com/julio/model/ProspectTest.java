@@ -4,7 +4,6 @@ import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Adresse;
 import main.com.julio.model.Interesse;
 import main.com.julio.model.Prospect;
-import main.com.julio.model.Societe;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -25,7 +24,7 @@ class ProspectTest {
     @BeforeEach
     void setUp() throws ValidationException {
         Adresse.resetCompteur();
-        Societe.resetCompteur();
+        Prospect.resetCompteur();
 
         adresseParDefault = new Adresse("5", "Avenue Principale", "54000", "Nancy");
         dateProspectionParDefault = LocalDate.of(2024, 11, 6);

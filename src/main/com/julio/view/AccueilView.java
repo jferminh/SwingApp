@@ -14,6 +14,7 @@ public class AccueilView extends JFrame {
     private ClientViewModel clientVM;
     private ProspectViewModel prospectVM;
 
+    private JLabel titre;
     private JRadioButton rbClients;
     private JRadioButton rbProspects;
 
@@ -43,7 +44,7 @@ public class AccueilView extends JFrame {
         JPanel mainPanel = new JPanel(new BorderLayout(12, 12));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
 
-        JLabel titre = new JLabel("Gestion des entités : Clients /  Prospects");
+        titre = new JLabel("Gestion des entités : Clients");
         titre.setFont(new Font("Arial", Font.BOLD, 20));
         mainPanel.add(titre, BorderLayout.NORTH);
 
@@ -67,7 +68,8 @@ public class AccueilView extends JFrame {
 
         gbc.gridx = 0;
         gbc.gridy = 0;
-        centerPanel.add(new JLabel("Sélectionnez le type d'entité : "), gbc);
+        JLabel labelSelection = new JLabel("Sélectionnez le type d'entité : ");
+        centerPanel.add(labelSelection, gbc);
         gbc.gridy = 1;
         centerPanel.add(radios, gbc);
 
@@ -89,6 +91,7 @@ public class AccueilView extends JFrame {
         centerPanel.add(actions, gbc);
 
         selectPanel = new JPanel(new GridBagLayout());
+
         selectPanel.setBorder(BorderFactory.createTitledBorder("Sélectionnez une société :"));
 
         GridBagConstraints gs = new GridBagConstraints();
@@ -128,21 +131,40 @@ public class AccueilView extends JFrame {
         setSelectPanelVisible(false);
 
         // Listeners
-        rbClients.addActionListener(e -> updateVoirContratsEnabled());
-        rbProspects.addActionListener(e -> updateVoirContratsEnabled());
+        rbClients.addActionListener(e -> {
+            titre.setText("Gestion des entités : Clients");
+            updateVoirContratsEnabled();
+        });
+        rbProspects.addActionListener(e -> {
+            titre.setText("Gestion des entités : Prospects");
+            updateVoirContratsEnabled();
+        });
         updateVoirContratsEnabled();
 
         btnCreer.addActionListener(e -> onCreer());
         btnModifier.addActionListener(e -> {
             actions.setVisible(false);
+            radios.setVisible(false);
+            labelSelection.setVisible(false);
+            titre.setText(rbClients.isSelected() ?
+                    "Gestion des entités : Clients | Action : Modifier" :
+                    "Gestion des entités : Prospects | Action : Modifier");
             prepareSelection("modifier");
         });
         btnSupprimer.addActionListener(e -> {
             actions.setVisible(false);
+            radios.setVisible(false);
+            labelSelection.setVisible(false);
+            titre.setText(rbClients.isSelected() ?
+                    "Gestion des entités : Clients | Action : Supprimer" :
+                    "Gestion des entités : Prospects | Action : Supprimer");
             prepareSelection("supprimer");
         });
         btnVoirContrats.addActionListener(e -> {
             actions.setVisible(false);
+            radios.setVisible(false);
+            labelSelection.setVisible(false);
+            titre.setText("Gestion des entités : Clients | Action : Voir Contrats");
             prepareSelection("voirContrats");
         });
         btnAfficher.addActionListener(e -> {
@@ -154,6 +176,8 @@ public class AccueilView extends JFrame {
         btnValider.addActionListener(e -> onValiderSelection());
         btnAnnuler.addActionListener(e -> {
             actions.setVisible(true);
+            radios.setVisible(true);
+            labelSelection.setVisible(true);
             cancelSelection();
         });
 
@@ -163,6 +187,7 @@ public class AccueilView extends JFrame {
 
     private void updateVoirContratsEnabled() {
         btnVoirContrats.setEnabled(rbClients.isSelected());
+
     }
 
     private void setSelectPanelVisible(boolean visible) {
@@ -234,6 +259,9 @@ public class AccueilView extends JFrame {
     }
 
     private void cancelSelection() {
+        titre.setText(rbClients.isSelected() ?
+                "Gestion des entités : Clients" :
+                "Gestion des entités : Prospects");
         this.currentAction = null;
         setSelectPanelVisible(false);
     }

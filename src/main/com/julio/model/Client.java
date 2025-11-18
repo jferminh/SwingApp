@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Client extends Societe {
+    private static int compteurId = 1;
     private long chiffreAffaires;
     private int nbEmployes;
     private List<Contrat> contrats;
@@ -13,7 +14,7 @@ public class Client extends Societe {
     public Client(String raisonSociale, Adresse adresse, String telephone,
                   String email, String commentaires, long chiffreAffaires,
                   int nbEmployes) throws ValidationException {
-        super(raisonSociale, adresse, telephone, email, commentaires);
+        super(compteurId++, raisonSociale, adresse, telephone, email, commentaires);
         setChiffreAffaires(chiffreAffaires);
         setNbEmployes(nbEmployes);
         this.contrats = new ArrayList<>();
@@ -60,7 +61,9 @@ public class Client extends Societe {
 
     }
 
-
+    public static void resetCompteur(){
+        compteurId = 1;
+    }
 
     @Override
     public String toString() {

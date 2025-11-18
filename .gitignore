@@ -5,7 +5,7 @@ out/
 .kotlin
 *.iml
 /.idea
-logs/
+logs/application.log
 
 
 ### Eclipse ###
