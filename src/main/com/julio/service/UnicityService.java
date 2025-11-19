@@ -17,16 +17,16 @@ public class UnicityService {
     public boolean isRaisonSocialeUnique(String raisonSociale, int idExcluire) {
         for (Prospect prospect : prospectRepo.findAll()) {
             if (prospect.getId() != idExcluire && prospect.getRaisonSociale().equalsIgnoreCase(raisonSociale)) {
-                return false;
+                return true;
             }
         }
         for (Client client : clientRepo.findAll()) {
             if (client.getId() != idExcluire && client.getRaisonSociale().equalsIgnoreCase(raisonSociale)) {
-                return false;
+                return true;
 
             }
         }
 
-        return true;
+        return false;
     }
 }

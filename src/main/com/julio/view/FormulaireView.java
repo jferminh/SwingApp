@@ -10,10 +10,14 @@ import main.com.julio.viewmodel.ClientViewModel;
 import main.com.julio.viewmodel.ProspectViewModel;
 
 import javax.swing.*;
-import javax.swing.text.html.ListView;
 import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.time.DateTimeException;
 import java.time.LocalDate;
+import java.util.logging.Level;
+
+import static main.com.julio.service.LoggingService.LOGGER;
 
 public class FormulaireView extends JFrame {
     private final ClientViewModel clientVM;
@@ -230,7 +234,10 @@ public class FormulaireView extends JFrame {
 
         JButton btnQuitter = new JButton("Quitter");
         btnQuitter.setPreferredSize(new Dimension(100, 28));
-        btnQuitter.addActionListener(e -> System.exit(0));
+        btnQuitter.addActionListener(e -> {
+            LOGGER.log(Level.INFO, "Application terminée (Quitter)");
+            System.exit(0);
+        });
         buttonPanel.add(btnQuitter);
 
         gbc.gridx = 0;

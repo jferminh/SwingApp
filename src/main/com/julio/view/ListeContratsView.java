@@ -3,6 +3,7 @@ package main.com.julio.view;
 import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Client;
 import main.com.julio.repository.ContratRepository;
+import main.com.julio.util.DisplayDialog;
 import main.com.julio.viewmodel.ClientViewModel;
 import main.com.julio.viewmodel.ContratViewModel;
 import main.com.julio.viewmodel.ProspectViewModel;
@@ -10,6 +11,11 @@ import main.com.julio.viewmodel.ProspectViewModel;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.util.logging.Level;
+
+import static main.com.julio.service.LoggingService.LOGGER;
 
 /**
  * Vue pour afficher et gérer les contrats d'un client.
@@ -40,16 +46,6 @@ public class ListeContratsView extends JFrame {
         initialiserInterface();
         chargerDonnees();
     }
-
-    // Constructeur alternatif avec ContratViewModel fourni
-//    public ListeContratsView(ClientViewModel clientVM, Client client, ContratViewModel contratVM) {
-//        this.clientVM = clientVM;
-//        this.client = client;
-//        this.contratVM = contratVM;
-//
-//        initialiserInterface();
-//        chargerDonnees();
-//    }
 
     private void initialiserInterface() {
         setTitle("Contrats de " + client.getRaisonSociale());
@@ -110,7 +106,10 @@ public class ListeContratsView extends JFrame {
 
         JButton btnQuitter = new JButton("Quitter");
         btnQuitter.setPreferredSize(new Dimension(120, 35));
-        btnQuitter.addActionListener(e -> System.exit(0));
+        btnQuitter.addActionListener(e -> {
+            LOGGER.log(Level.INFO, "Application terminée (Quitter)");
+            System.exit(0);
+        });
         buttonPanel.add(btnQuitter);
 
         mainPanel.add(buttonPanel, BorderLayout.SOUTH);
@@ -147,15 +146,19 @@ public class ListeContratsView extends JFrame {
                 chargerDonnees();
 
             } catch (ValidationException ve) {
-                JOptionPane.showMessageDialog(this, ve.getMessage(),
-                        "Erreur d'entrée", JOptionPane.ERROR_MESSAGE);
+                DisplayDialog.messageError(
+                        "Erreur d'entrée", ve.getMessage()
+                );
             } catch (NumberFormatException nfe) {
-                JOptionPane.showMessageDialog(this,
-                        "Erreur de format numérique. Vérifiez vos saisies.",
-                        "Erreur d'entrée", JOptionPane.ERROR_MESSAGE);
+                DisplayDialog.messageError(
+                        "Erreur d'entrée",
+                        "Erreur de format numérique. Vérifiez vos saisies."
+                );
             } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Erreur : " + e.getMessage(),
-                        "Erreur", JOptionPane.ERROR_MESSAGE);
+                DisplayDialog.messageError(
+                        "Erreur", e.getMessage()
+                );
+                LOGGER.log(Level.SEVERE, e.getMessage(), e);
             }
         }
     }
@@ -195,14 +198,19 @@ public class ListeContratsView extends JFrame {
                 chargerDonnees();
 
             } catch (ValidationException ve) {
-                JOptionPane.showMessageDialog(this, ve.getMessage(),
-                        "Erreur d'entrée", JOptionPane.ERROR_MESSAGE);
+                DisplayDialog.messageError(
+                        "Erreur d'entrée", ve.getMessage()
+                );
             } catch (NumberFormatException nfe) {
-                JOptionPane.showMessageDialog(this, "Veuillez saisir des chiffres.",
-                        "Erreur d'entrée", JOptionPane.ERROR_MESSAGE);
+                DisplayDialog.messageError(
+                        "Erreur d'entrée",
+                        "Veuillez saisir des chiffres."
+                );
             } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Erreur : " + e.getMessage(),
-                        "Erreur", JOptionPane.ERROR_MESSAGE);
+                DisplayDialog.messageError(
+                        "Erreur", e.getMessage()
+                );
+                LOGGER.log(Level.SEVERE, e.getMessage(), e);
             }
         }
     }
@@ -226,12 +234,16 @@ public class ListeContratsView extends JFrame {
             boolean success = contratVM.supprimerContrat(contratId);
 
             if (success) {
-                JOptionPane.showMessageDialog(this, "Contrat supprimé avec succès!",
-                        "Succès", JOptionPane.INFORMATION_MESSAGE);
+                DisplayDialog.messageInfo(
+                        "Succès",
+                        "Contrat supprimé avec succès!"
+                );
                 chargerDonnees();
             } else {
-                JOptionPane.showMessageDialog(this, "Erreur lors de la suppression",
-                        "Erreur", JOptionPane.ERROR_MESSAGE);
+                DisplayDialog.messageError(
+                        "Erreur",
+                        "Erreur lors de la suppression!"
+                );
             }
         }
     }

@@ -1,14 +1,19 @@
 package main.com.julio.view;
 
 import main.com.julio.model.Client;
-import main.com.julio.model.Interesse;
 import main.com.julio.model.Prospect;
+import main.com.julio.util.DisplayDialog;
 import main.com.julio.viewmodel.ClientViewModel;
 import main.com.julio.viewmodel.ProspectViewModel;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.List;
+import java.util.logging.Level;
+
+import static main.com.julio.service.LoggingService.LOGGER;
 
 public class AccueilView extends JFrame {
     private ClientViewModel clientVM;
@@ -21,7 +26,6 @@ public class AccueilView extends JFrame {
     private JButton btnVoirContrats;
 
     private JPanel selectPanel;
-    private JLabel selectLabel;
     private JComboBox<Object> comboSelect;
 
     private String currentAction = null;
@@ -100,7 +104,6 @@ public class AccueilView extends JFrame {
 
         comboSelect = new JComboBox<>();
         comboSelect.setPreferredSize(new Dimension(420, 28));
-        gs.gridy = 1;
         gs.gridy = 0;
         gs.weightx = 0;
         gs.fill = GridBagConstraints.HORIZONTAL;
@@ -171,7 +174,10 @@ public class AccueilView extends JFrame {
             if (isClientSelected()) ouvrirGestionClients();
             else ouvrirGestionProspects();
         });
-        btnQuitter.addActionListener(e -> System.exit(0));
+        btnQuitter.addActionListener(e -> {
+            LOGGER.log(Level.INFO, "Application terminée (Quitter)");
+            System.exit(0);
+        });
 
         btnValider.addActionListener(e -> onValiderSelection());
         btnAnnuler.addActionListener(e -> {
@@ -215,8 +221,10 @@ public class AccueilView extends JFrame {
         if (isClientSelected()) {
             List<Client> clients = clientVM.getTousLesClients();
             if (clients.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Aucun client disponible",
-                        "Info", JOptionPane.INFORMATION_MESSAGE);
+                DisplayDialog.messageInfo(
+                        "Info",
+                        "Aucun client disponible"
+                );
                 this.currentAction = null;
                 setSelectPanelVisible(false);
                 return;
@@ -227,8 +235,10 @@ public class AccueilView extends JFrame {
         } else {
             List<Prospect> prospects = prospectVM.getTousLesProspects();
             if (prospects.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Aucun prospect disponible.",
-                        "Info", JOptionPane.INFORMATION_MESSAGE);
+                DisplayDialog.messageInfo(
+                        "Info",
+                        "Aucun prospect disponible"
+                );
                 this.currentAction = null;
                 setSelectPanelVisible(false);
                 return;
@@ -273,16 +283,19 @@ public class AccueilView extends JFrame {
         }
         Object selected = comboSelect.getSelectedItem();
         if (selected == null) {
-            JOptionPane.showMessageDialog(this,
-                    "Veuillez sélectionner un élément.",
-                    "Info", JOptionPane.INFORMATION_MESSAGE);
+            DisplayDialog.messageInfo(
+                    "Info",
+                    "Veuillez sélectionner un élément"
+            );
+
             return;
         }
         switch (currentAction) {
             case "modifier" -> handleModifier(selected);
             case "supprimer" -> handleSupprimer(selected);
             case "voirContrats" -> handleVoirContrats(selected);
-            default -> {}
+            default -> {
+            }
         }
 
         cancelSelection();
@@ -314,9 +327,10 @@ public class AccueilView extends JFrame {
 
     private void handleVoirContrats(Object selected) {
         if (!(selected instanceof Client c)) {
-            JOptionPane.showMessageDialog(this,
-                    "La visualisation des contrats n'est disponible que pour les clients.",
-                    "Info", JOptionPane.INFORMATION_MESSAGE);
+            DisplayDialog.messageInfo(
+                    "Info",
+                    "La visualisation des contrats n'est disponible que pour les clients."
+            );
             return;
         }
         ListeContratsView contratsView = new ListeContratsView(clientVM, prospectVM, c, origin);
@@ -335,4 +349,6 @@ public class AccueilView extends JFrame {
         listeProspects.setVisible(true);
         this.dispose();
     }
+
+
 }

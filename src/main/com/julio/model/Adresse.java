@@ -1,7 +1,6 @@
 package main.com.julio.model;
 
 import main.com.julio.exception.ValidationException;
-import main.com.julio.service.LoggingService;
 import main.com.julio.service.ValidationService;
 
 public class Adresse {
@@ -18,7 +17,6 @@ public class Adresse {
         setNomRue(nomRue);
         setCodePostal(codePostal);
         setVille(ville);
-//        LoggingService.log("Adresse créé avec ID : " + this.id);
     }
 
     public int getId() {
@@ -78,7 +76,7 @@ public class Adresse {
         return numeroRue + " " + nomRue + " " + codePostal + " " + ville;
     }
 
-    public static void resetCompteur(){
+    public static void resetCompteur() {
         compteurId = 1;
     }
 

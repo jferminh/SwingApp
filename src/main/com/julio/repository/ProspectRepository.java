@@ -4,7 +4,6 @@ import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Adresse;
 import main.com.julio.model.Interesse;
 import main.com.julio.model.Prospect;
-import main.com.julio.service.LoggingService;
 import main.com.julio.util.DateUtils;
 
 import java.util.ArrayList;

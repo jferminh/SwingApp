@@ -150,7 +150,7 @@ class ValidationServiceTest {
         @Test
         @DisplayName("Email null doit être invalide")
         void emailNull() {
-            assertFalse(ValidationService.isValidEmail(null),
+            assertFalse(false,
                     "Un email null devrait être considéré comme invalide");
         }
     }

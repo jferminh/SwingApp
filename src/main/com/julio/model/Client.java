@@ -14,9 +14,10 @@ public class Client extends Societe {
     public Client(String raisonSociale, Adresse adresse, String telephone,
                   String email, String commentaires, long chiffreAffaires,
                   int nbEmployes) throws ValidationException {
-        super(compteurId++, raisonSociale, adresse, telephone, email, commentaires);
+        super(compteurId, raisonSociale, adresse, telephone, email, commentaires);
         setChiffreAffaires(chiffreAffaires);
         setNbEmployes(nbEmployes);
+        compteurId = compteurId + 1;
         this.contrats = new ArrayList<>();
     }
 
@@ -46,10 +47,6 @@ public class Client extends Societe {
         this.nbEmployes = nbEmployes;
     }
 
-    public void setContrats(List<Contrat> contrats) {
-        this.contrats = contrats;
-    }
-
     public void ajouterContrat(Contrat contrat) {
         if (contrat != null && !contrats.contains(contrat)) {
             contrats.add(contrat);
@@ -61,7 +58,7 @@ public class Client extends Societe {
 
     }
 
-    public static void resetCompteur(){
+    public static void resetCompteur() {
         compteurId = 1;
     }
 

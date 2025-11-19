@@ -2,6 +2,7 @@ import main.com.julio.exception.ValidationException;
 import main.com.julio.repository.ClientRepository;
 import main.com.julio.repository.ContratRepository;
 import main.com.julio.repository.ProspectRepository;
+import main.com.julio.service.LoggingService;
 import main.com.julio.service.UnicityService;
 import main.com.julio.view.AccueilView;
 import main.com.julio.viewmodel.ClientViewModel;
@@ -10,13 +11,23 @@ import main.com.julio.viewmodel.ProspectViewModel;
 
 import javax.swing.*;
 
+import java.util.logging.Level;
 
-void main() throws ValidationException {
+import static main.com.julio.service.LoggingService.LOGGER;
+
+
+void main() throws ValidationException, IOException {
+    // Initialisation de Logs
+    LoggingService.intFichierLog();
+    LOGGER.log(Level.INFO, "Démarrage de la application");
+
     try {
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
     } catch (Exception e) {
         e.printStackTrace();
+        LOGGER.log(Level.SEVERE, e.getMessage(), e);
     }
+
 
     // Initialisation des repositories
     ClientRepository clientRepo = new ClientRepository();

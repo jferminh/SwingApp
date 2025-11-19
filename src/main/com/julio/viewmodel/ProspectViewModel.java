@@ -6,12 +6,14 @@ import main.com.julio.model.Adresse;
 import main.com.julio.model.Interesse;
 import main.com.julio.model.Prospect;
 import main.com.julio.repository.ProspectRepository;
-import main.com.julio.service.LoggingService;
 import main.com.julio.service.UnicityService;
 
 import javax.swing.table.DefaultTableModel;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.logging.Level;
+
+import static main.com.julio.service.LoggingService.LOGGER;
 
 public class ProspectViewModel {
     private final ProspectRepository prospectRepo;
@@ -22,19 +24,19 @@ public class ProspectViewModel {
         this.unicityService = unicityService;
     }
 
-    public Prospect creerProspect(String raisonSociale,
-                                  String numeroRue,
-                                  String nomRue,
-                                  String codePostal,
-                                  String ville,
-                                  String telephone,
-                                  String email,
-                                  String commentaires,
-                                  LocalDate dateProspection,
-                                  Interesse interesse
+    public void creerProspect(String raisonSociale,
+                              String numeroRue,
+                              String nomRue,
+                              String codePostal,
+                              String ville,
+                              String telephone,
+                              String email,
+                              String commentaires,
+                              LocalDate dateProspection,
+                              Interesse interesse
     ) throws ValidationException {
         try {
-            if (!unicityService.isRaisonSocialeUnique(raisonSociale, -1)) {
+            if (unicityService.isRaisonSocialeUnique(raisonSociale, -1)) {
                 throw new ValidationException("Cette raison sociale existe dèjà");
             }
 
@@ -52,26 +54,25 @@ public class ProspectViewModel {
 
             prospectRepo.add(prospect);
 
-            return prospect;
         } catch (Exception e) {
-            LoggingService.logError("Erreur création prospect", e);
+            LOGGER.log(Level.SEVERE, e.getMessage(), e);
             throw e;
         }
     }
 
-    public boolean modifierProspect(int id,
-                                    String raisonSociale,
-                                    String numeroRue,
-                                    String nomRue,
-                                    String codePostal,
-                                    String ville,
-                                    String telephone,
-                                    String email,
-                                    String commentaires,
-                                    LocalDate dateProspection,
-                                    Interesse interesse) throws ValidationException, NotFoundException {
+    public void modifierProspect(int id,
+                                 String raisonSociale,
+                                 String numeroRue,
+                                 String nomRue,
+                                 String codePostal,
+                                 String ville,
+                                 String telephone,
+                                 String email,
+                                 String commentaires,
+                                 LocalDate dateProspection,
+                                 Interesse interesse) throws ValidationException, NotFoundException {
         try {
-            if (!unicityService.isRaisonSocialeUnique(raisonSociale, id)) {
+            if (unicityService.isRaisonSocialeUnique(raisonSociale, id)) {
                 throw new ValidationException("Cette raison sociale existe dèjà");
             }
 
@@ -92,9 +93,9 @@ public class ProspectViewModel {
             prospect.setDateProspection(dateProspection);
             prospect.setInteresse(interesse);
 
-            return prospectRepo.update(prospect);
+            prospectRepo.update(prospect);
         } catch (Exception e) {
-            LoggingService.logError("Erreur modification prospect", e);
+            LOGGER.log(Level.SEVERE, e.getMessage(), e);
             throw e;
         }
     }
@@ -104,7 +105,7 @@ public class ProspectViewModel {
 
             return prospectRepo.delete(id);
         } catch (Exception e) {
-            LoggingService.logError("Erreur suppression prospect", e);
+            LOGGER.log(Level.SEVERE, e.getMessage(), e);
             return false;
         }
     }

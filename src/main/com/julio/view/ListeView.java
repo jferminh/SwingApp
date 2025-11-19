@@ -1,6 +1,7 @@
 package main.com.julio.view;
 
 import main.com.julio.model.Client;
+import main.com.julio.util.DisplayDialog;
 import main.com.julio.viewmodel.ClientViewModel;
 import main.com.julio.viewmodel.ProspectViewModel;
 
@@ -9,6 +10,9 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.logging.Level;
+
+import static main.com.julio.service.LoggingService.LOGGER;
 
 public class ListeView extends JFrame {
     private final ClientViewModel clientVM;
@@ -88,7 +92,10 @@ public class ListeView extends JFrame {
 
         JButton btnQuitter = new JButton("Quitter");
         btnQuitter.setPreferredSize(new Dimension(120, 35));
-        btnQuitter.addActionListener(e -> System.exit(0));
+        btnQuitter.addActionListener(e -> {
+            LOGGER.log(Level.INFO, "Application terminée (Quitter)");
+            System.exit(0);
+        });
         buttonPanel.add(btnQuitter);
 
         mainPanel.add(buttonPanel, BorderLayout.SOUTH);
@@ -106,7 +113,7 @@ public class ListeView extends JFrame {
         FormulaireView form = new FormulaireView(clientVM, prospectVM, isClient, id, action, "listeview");
         form.setVisible(true);
         this.dispose();
-        form.addWindowListener(new  WindowAdapter() {
+        form.addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosed(WindowEvent windowEvent) {
                 chargerDonnees();
@@ -117,11 +124,11 @@ public class ListeView extends JFrame {
     private void modifierSelection() {
         int selectedRow = table.getSelectedRow();
         if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(
-                    this,
-                    "Veuillez sélectionner une ligne",
-                    "Aucune séléction", JOptionPane.WARNING_MESSAGE
+            DisplayDialog.messageWarning(
+                    "Aucune client",
+                    "Veuillez sélectionner une ligne"
             );
+
             return;
         }
 
@@ -132,11 +139,11 @@ public class ListeView extends JFrame {
     private void supprimerSelection() {
         int selectedRow = table.getSelectedRow();
         if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(
-                    this,
-                    "Veuillez sélectionner une ligne",
-                    "Aucune sélection", JOptionPane.WARNING_MESSAGE
+            DisplayDialog.messageWarning(
+                    "Aucune client",
+                    "Veuillez sélectionner une ligne"
             );
+
             return;
         }
         int id = (int) table.getValueAt(selectedRow, 0);
@@ -147,11 +154,11 @@ public class ListeView extends JFrame {
     private void voirContrats() {
         int selectedRow = table.getSelectedRow();
         if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(
-                    this,
-                    "Veuillez sélectionner un client",
-                    "Aucune client", JOptionPane.WARNING_MESSAGE
+            DisplayDialog.messageWarning(
+                    "Aucune client",
+                    "Veuillez sélectionner un client"
             );
+
             return;
         }
 

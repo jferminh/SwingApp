@@ -59,10 +59,6 @@ public class Contrat {
         this.montant = montant;
     }
 
-//    public static void resetCompteur() {
-//        compteurId = 1;
-//    }
-
     public String toString() {
         return nomContrat + " (" + montant + "€)";
     }

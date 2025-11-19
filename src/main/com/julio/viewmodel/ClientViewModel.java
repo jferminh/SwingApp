@@ -6,11 +6,13 @@ import main.com.julio.model.Adresse;
 import main.com.julio.model.Client;
 import main.com.julio.repository.ClientRepository;
 import main.com.julio.repository.ContratRepository;
-import main.com.julio.service.LoggingService;
 import main.com.julio.service.UnicityService;
 
 import javax.swing.table.DefaultTableModel;
 import java.util.List;
+import java.util.logging.Level;
+
+import static main.com.julio.service.LoggingService.LOGGER;
 
 public class ClientViewModel {
     public ClientRepository clientRepo;
@@ -25,18 +27,18 @@ public class ClientViewModel {
         this.unicityService = unicityService;
     }
 
-    public Client creerClient(String raisonSociale,
-                              String numeroRue,
-                              String nomRue,
-                              String codePostal,
-                              String ville,
-                              String telephone,
-                              String email,
-                              String commentaires,
-                              long chiffreAffaires,
-                              int nbEmployes) throws ValidationException, NotFoundException {
+    public void creerClient(String raisonSociale,
+                            String numeroRue,
+                            String nomRue,
+                            String codePostal,
+                            String ville,
+                            String telephone,
+                            String email,
+                            String commentaires,
+                            long chiffreAffaires,
+                            int nbEmployes) throws ValidationException, NotFoundException {
         try {
-            if (!unicityService.isRaisonSocialeUnique(raisonSociale, -1)) {
+            if (unicityService.isRaisonSocialeUnique(raisonSociale, -1)) {
                 throw new ValidationException("Cette raison sociale existe déjà");
             }
 
@@ -46,26 +48,25 @@ public class ClientViewModel {
                     telephone, email, commentaires, chiffreAffaires, nbEmployes);
 
             clientRepo.add(client);
-            return client;
         } catch (Exception e) {
-            LoggingService.logError("Erreur création client", e);
+            LOGGER.log(Level.WARNING, e.getMessage(), e);
             throw e;
         }
     }
 
-    public boolean modifierClient(int id,
-                                  String raisonSociale,
-                                  String numeroRue,
-                                  String nomRue,
-                                  String codePostal,
-                                  String ville,
-                                  String telephone,
-                                  String email,
-                                  String commentaires,
-                                  long chiffreAffaires,
-                                  int nbEmployes) throws ValidationException, NotFoundException {
+    public void modifierClient(int id,
+                               String raisonSociale,
+                               String numeroRue,
+                               String nomRue,
+                               String codePostal,
+                               String ville,
+                               String telephone,
+                               String email,
+                               String commentaires,
+                               long chiffreAffaires,
+                               int nbEmployes) throws ValidationException, NotFoundException {
         try {
-            if (!unicityService.isRaisonSocialeUnique(raisonSociale, id)) {
+            if (unicityService.isRaisonSocialeUnique(raisonSociale, id)) {
                 throw new ValidationException("Cette raison sociale existe dèjà");
             }
             Client client = clientRepo.findById(id);
@@ -85,9 +86,9 @@ public class ClientViewModel {
             client.setChiffreAffaires(chiffreAffaires);
             client.setNbEmployes(nbEmployes);
 
-            return clientRepo.update(client);
+            clientRepo.update(client);
         } catch (Exception e) {
-            LoggingService.logError("Erreur modification client", e);
+            LOGGER.log(Level.WARNING, e.getMessage(), e);
             throw e;
         }
     }
@@ -100,7 +101,7 @@ public class ClientViewModel {
 
             return clientRepo.delete(id);
         } catch (Exception e) {
-            LoggingService.logError("Erreur suppression client", e);
+            LOGGER.log(Level.WARNING, e.getMessage(), e);
             return false;
         }
     }
@@ -139,8 +140,4 @@ public class ClientViewModel {
         return model;
     }
 
-    public Client[] getClientsForComboBox() {
-        List<Client> clients = getTousLesClients();
-        return clients.toArray(new Client[0]);
-    }
 }

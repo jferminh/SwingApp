@@ -1,15 +1,16 @@
 package main.com.julio.viewmodel;
 
-import main.com.julio.exception.NotFoundException;
 import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Client;
 import main.com.julio.model.Contrat;
 import main.com.julio.repository.ClientRepository;
 import main.com.julio.repository.ContratRepository;
-import main.com.julio.service.LoggingService;
 
 import javax.swing.table.DefaultTableModel;
 import java.util.List;
+import java.util.logging.Level;
+
+import static main.com.julio.service.LoggingService.LOGGER;
 
 public class ContratViewModel {
     private final ContratRepository contratRepo;
@@ -20,7 +21,7 @@ public class ContratViewModel {
         this.clientRepo = clientRepo;
     }
 
-    public Contrat creerContrat(int clientId, String nomContrat, double montant) throws ValidationException {
+    public void creerContrat(int clientId, String nomContrat, double montant) throws ValidationException {
         try {
             Client client = clientRepo.findById(clientId);
             if (client == null) {
@@ -33,16 +34,15 @@ public class ContratViewModel {
 
             client.ajouterContrat(contrat);
 
-            return contrat;
         } catch (ValidationException ve) {
             throw ve;
         } catch (Exception e) {
-            LoggingService.logError("Erreur création contrat", e);
+            LOGGER.log(Level.WARNING, e.getMessage(), e);
             throw e;
         }
     }
 
-    public boolean modifierContrat(int id, String nomContrat, double montant) throws ValidationException {
+    public void modifierContrat(int id, String nomContrat, double montant) throws ValidationException {
         try {
             Contrat contrat = contratRepo.findById(id);
             if (contrat == null) {
@@ -52,9 +52,11 @@ public class ContratViewModel {
             contrat.setNomContrat(nomContrat);
             contrat.setMontant(montant);
 
-            return contratRepo.update(contrat);
+            contratRepo.update(contrat);
+        } catch (ValidationException ve) {
+            throw ve;
         } catch (Exception e) {
-            LoggingService.logError("Erreur modification contrat", e);
+            LOGGER.log(Level.WARNING, e.getMessage(), e);
             throw e;
         }
     }
@@ -71,15 +73,10 @@ public class ContratViewModel {
                 client.supprimerContrat(contrat);
             }
 
-            boolean success = contratRepo.delete(id);
-
-            if (success) {
-                LoggingService.log("Contrat supprimé avec succès: ID= " + id);
-            }
-            return success;
+            return contratRepo.delete(id);
 
         } catch (Exception e) {
-            LoggingService.logError("Erreur suppression contrat", e);
+            LOGGER.log(Level.WARNING, e.getMessage(), e);
             return false;
         }
     }

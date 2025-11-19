@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 public class ContratRepository {
     private List<Contrat> contrats;
 
-    public ContratRepository(){
+    public ContratRepository() {
         this.contrats = new ArrayList<>();
     }
 
@@ -17,14 +17,13 @@ public class ContratRepository {
         this.contrats.add(contrat);
     }
 
-    public boolean update(Contrat contrat) {
+    public void update(Contrat contrat) {
         for (int i = 0; i < this.contrats.size(); i++) {
             if (this.contrats.get(i).getId() == contrat.getId()) {
                 this.contrats.set(i, contrat);
-                return true;
+                return;
             }
         }
-        return false;
     }
 
     public boolean delete(int id) {
