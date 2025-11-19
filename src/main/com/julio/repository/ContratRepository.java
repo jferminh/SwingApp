@@ -14,7 +14,7 @@ public class ContratRepository {
     }
 
     public void add(Contrat contrat) {
-        this.contrats.add(contrat);
+        contrats.add(contrat);
     }
 
     public void update(Contrat contrat) {
@@ -44,7 +44,4 @@ public class ContratRepository {
                 .collect(Collectors.toList());
     }
 
-    public List<Contrat> findAll() {
-        return new ArrayList<>(contrats);
-    }
 }

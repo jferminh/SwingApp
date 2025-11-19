@@ -3,16 +3,19 @@ package main.com.julio.repository;
 import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Adresse;
 import main.com.julio.model.Client;
+import main.com.julio.model.Contrat;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 public class ClientRepository {
-    public List<Client> clients;
+    private List<Client> clients;
+    private ContratRepository contratRepo;
 
-    public ClientRepository() throws ValidationException {
+    public ClientRepository(ContratRepository contratRepo) throws ValidationException {
         this.clients = new ArrayList<>();
+        this.contratRepo = contratRepo;
         initialiserDonneesDemo();
     }
 
@@ -76,7 +79,7 @@ public class ClientRepository {
                 "54390",
                 "Frouard"
         );
-        clients.add(new Client(
+        Client c1 = new Client(
                 "IBM",
                 adresse1,
                 "0778663083",
@@ -84,9 +87,10 @@ public class ClientRepository {
                 "",
                 5000,
                 10
-        ));
+        );
+        add(c1);
 
-        clients.add(new Client(
+        Client c2 = new Client(
                 "Apple",
                 adresse2,
                 "0778663083",
@@ -94,8 +98,10 @@ public class ClientRepository {
                 "",
                 50000,
                 100
-        ));
-        clients.add(new Client(
+        );
+        add(c2);
+
+        Client c3 = new Client(
                 "Microsoft",
                 adresse3,
                 "0778663083",
@@ -103,6 +109,34 @@ public class ClientRepository {
                 "",
                 500000,
                 1000
-        ));
+        );
+        add(c3);
+
+        prechargerContrats(c1.getId(),
+                new Contrat(c1.getId(), "TMA ERP", 45000),
+                new Contrat(c1.getId(), "Projet BI 2025", 82000)
+        );
+
+        prechargerContrats(c2.getId(),
+                new Contrat(c2.getId(), "Migration Cloud", 150000),
+                new Contrat(c2.getId(), "Support Niveau 2", 36000),
+                new Contrat(c2.getId(), "Audit Cybersécurité", 22000)
+        );
+
+        prechargerContrats(c3.getId(),
+                new Contrat(c3.getId(), "Refonte Site Web", 28000)
+        );
+
+
+    }
+
+    private void prechargerContrats(int clientId, Contrat... contrats ) {
+        for (Contrat ct : contrats) {
+            contratRepo.add(ct);
+            Client cli = findById(clientId);
+            if (ct != null) {
+                cli.ajouterContrat(ct);
+            }
+        }
     }
 }

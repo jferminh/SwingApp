@@ -30,9 +30,9 @@ void main() throws ValidationException, IOException {
 
 
     // Initialisation des repositories
-    ClientRepository clientRepo = new ClientRepository();
-    ProspectRepository prospectRepo = new ProspectRepository();
     ContratRepository contratRepo = new ContratRepository();
+    ClientRepository clientRepo = new ClientRepository(contratRepo);
+    ProspectRepository prospectRepo = new ProspectRepository();
 
     // Initialisation des services
     UnicityService unicityService = new UnicityService(clientRepo, prospectRepo);
@@ -43,7 +43,7 @@ void main() throws ValidationException, IOException {
     ContratViewModel contratVM = new ContratViewModel(contratRepo, clientRepo);
 
     SwingUtilities.invokeLater(() -> {
-        AccueilView accueil = new AccueilView(clientVM, prospectVM);
+        AccueilView accueil = new AccueilView(clientVM, prospectVM, contratVM);
         accueil.setVisible(true);
     });
 }

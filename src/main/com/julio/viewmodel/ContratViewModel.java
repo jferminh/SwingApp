@@ -90,6 +90,7 @@ public class ContratViewModel {
         DefaultTableModel model = new DefaultTableModel(colonnes, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
+
                 return false;
             }
         };

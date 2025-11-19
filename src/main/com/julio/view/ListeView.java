@@ -3,6 +3,7 @@ package main.com.julio.view;
 import main.com.julio.model.Client;
 import main.com.julio.util.DisplayDialog;
 import main.com.julio.viewmodel.ClientViewModel;
+import main.com.julio.viewmodel.ContratViewModel;
 import main.com.julio.viewmodel.ProspectViewModel;
 
 import javax.swing.*;
@@ -17,14 +18,16 @@ import static main.com.julio.service.LoggingService.LOGGER;
 public class ListeView extends JFrame {
     private final ClientViewModel clientVM;
     private final ProspectViewModel prospectVM;
+    private final ContratViewModel contratVM;
     private final boolean isClient;
 
     private JTable table;
     private DefaultTableModel tableModel;
 
-    ListeView(ClientViewModel clientVM, ProspectViewModel prospectVM, boolean isClient) {
+    ListeView(ClientViewModel clientVM, ProspectViewModel prospectVM, ContratViewModel contratVM, boolean isClient) {
         this.clientVM = clientVM;
         this.prospectVM = prospectVM;
+        this.contratVM = contratVM;
         this.isClient = isClient;
 
         initComponents();
@@ -110,7 +113,7 @@ public class ListeView extends JFrame {
     }
 
     private void ouvrirFormulaire(Integer id, String action) {
-        FormulaireView form = new FormulaireView(clientVM, prospectVM, isClient, id, action, "listeview");
+        FormulaireView form = new FormulaireView(clientVM, prospectVM, contratVM, isClient, id, action, "listeview");
         form.setVisible(true);
         this.dispose();
         form.addWindowListener(new WindowAdapter() {
@@ -165,13 +168,13 @@ public class ListeView extends JFrame {
         int clientId = (int) table.getValueAt(selectedRow, 0);
         Client client = clientVM.getClientById(clientId);
 
-        ListeContratsView contratsView = new ListeContratsView(clientVM, prospectVM, client, "listeview");
+        ListeContratsView contratsView = new ListeContratsView(clientVM, prospectVM, contratVM, client, "listeview");
         contratsView.setVisible(true);
         this.dispose();
     }
 
     private void retourAccueil() {
-        AccueilView accueil = new AccueilView(clientVM, prospectVM);
+        AccueilView accueil = new AccueilView(clientVM, prospectVM, contratVM);
         accueil.setVisible(true);
         this.dispose();
     }

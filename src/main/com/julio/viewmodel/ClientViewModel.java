@@ -36,7 +36,7 @@ public class ClientViewModel {
                             String email,
                             String commentaires,
                             long chiffreAffaires,
-                            int nbEmployes) throws ValidationException, NotFoundException {
+                            int nbEmployes) throws ValidationException {
         try {
             if (unicityService.isRaisonSocialeUnique(raisonSociale, -1)) {
                 throw new ValidationException("Cette raison sociale existe déjà");

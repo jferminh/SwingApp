@@ -7,6 +7,7 @@ import main.com.julio.model.Prospect;
 import main.com.julio.util.DateUtils;
 import main.com.julio.util.DisplayDialog;
 import main.com.julio.viewmodel.ClientViewModel;
+import main.com.julio.viewmodel.ContratViewModel;
 import main.com.julio.viewmodel.ProspectViewModel;
 
 import javax.swing.*;
@@ -22,6 +23,7 @@ import static main.com.julio.service.LoggingService.LOGGER;
 public class FormulaireView extends JFrame {
     private final ClientViewModel clientVM;
     private final ProspectViewModel prospectVM;
+    private final ContratViewModel contratVM;
     private final boolean isClient;
     private final Integer entityId;
     private final String action;
@@ -47,10 +49,11 @@ public class FormulaireView extends JFrame {
     private JTextField txtDateProspection;
     private JComboBox<Interesse> cmbInteresse;
 
-    public FormulaireView(ClientViewModel clientVM, ProspectViewModel prospectVM,
+    public FormulaireView(ClientViewModel clientVM, ProspectViewModel prospectVM, ContratViewModel contratVM,
                           boolean isClient, Integer entityId, String action, String origin) {
         this.clientVM = clientVM;
         this.prospectVM = prospectVM;
+        this.contratVM = contratVM;
         this.isClient = isClient;
         this.entityId = entityId;
         this.action = action;
@@ -252,7 +255,7 @@ public class FormulaireView extends JFrame {
 
     private void voirContrats() {
         Client client = clientVM.getClientById(entityId);
-        ListeContratsView contratsView = new ListeContratsView(clientVM, prospectVM, client, "formulaireview");
+        ListeContratsView contratsView = new ListeContratsView(clientVM, prospectVM, contratVM, client, "formulaireview");
         contratsView.setVisible(true);
         this.dispose();
     }
@@ -393,11 +396,11 @@ public class FormulaireView extends JFrame {
     }
     private void retour(){
         if (origin.equals("accueil")) {
-            AccueilView accueilView = new AccueilView(clientVM, prospectVM);
+            AccueilView accueilView = new AccueilView(clientVM, prospectVM, contratVM);
             accueilView.setVisible(true);
             this.dispose();
         } else {
-            ListeView listeView = new ListeView(clientVM, prospectVM, isClient);
+            ListeView listeView = new ListeView(clientVM, prospectVM, contratVM, isClient);
             listeView.setVisible(true);
             this.dispose();
         }

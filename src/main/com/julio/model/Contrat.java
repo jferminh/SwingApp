@@ -12,10 +12,10 @@ public class Contrat {
     private double montant;
 
     public Contrat(int clientId, String nomContrat, double montant) throws ValidationException {
-        this.id = compteurId++;
         setClientId(clientId);
         setNomContrat(nomContrat);
         setMontant(montant);
+        this.id = compteurId++;
     }
 
     public int getId() {

@@ -11,8 +11,6 @@ import main.com.julio.viewmodel.ProspectViewModel;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.util.logging.Level;
 
 import static main.com.julio.service.LoggingService.LOGGER;
@@ -33,15 +31,16 @@ public class ListeContratsView extends JFrame {
     private JTable table;
     private DefaultTableModel tableModelContrats;
 
-    public ListeContratsView(ClientViewModel clientVM, ProspectViewModel prospectVM, Client client, String origin) {
+    public ListeContratsView(ClientViewModel clientVM, ProspectViewModel prospectVM, ContratViewModel contratVM, Client client, String origin) {
         this.clientVM = clientVM;
         this.prospectVM = prospectVM;
+        this.contratVM = contratVM;
         this.client = client;
         this.origin = origin;
 
         // Créer le ContratViewModel (nécessite ContratRepository)
-        ContratRepository contratRepo = new ContratRepository();
-        this.contratVM = new ContratViewModel(contratRepo, clientVM.clientRepo);
+//        ContratRepository contratRepo = new ContratRepository();
+//        this.contratVM = new ContratViewModel(contratRepo, clientVM.clientRepo);
 
         initialiserInterface();
         chargerDonnees();
@@ -190,11 +189,15 @@ public class ListeContratsView extends JFrame {
         if (result == JOptionPane.OK_OPTION) {
             try {
                 String nom = txtNom.getText().trim();
-                double montant = Double.parseDouble(txtMontant.getText().trim());
+                double montant = Double.parseDouble(
+                        txtMontant.getText().trim().replace(",", ".")
+                );
 
                 contratVM.modifierContrat(contratId, nom, montant);
-                JOptionPane.showMessageDialog(this, "Contrat modifié avec succès!",
-                        "Succès", JOptionPane.INFORMATION_MESSAGE);
+                DisplayDialog.messageInfo(
+                        "Succès",
+                        "Contrat modifié avec succès!"
+                );
                 chargerDonnees();
 
             } catch (ValidationException ve) {
@@ -251,17 +254,17 @@ public class ListeContratsView extends JFrame {
     private void retour() {
         switch (origin) {
             case "accueil" -> {
-                AccueilView accueilView = new AccueilView(clientVM, prospectVM);
+                AccueilView accueilView = new AccueilView(clientVM, prospectVM, contratVM);
                 accueilView.setVisible(true);
                 this.dispose();
             }
             case "listeview" -> {
-                ListeView listeView = new ListeView(clientVM, prospectVM, true);
+                ListeView listeView = new ListeView(clientVM, prospectVM, contratVM, true);
                 listeView.setVisible(true);
                 this.dispose();
             }
             default -> {
-                FormulaireView formulaireView = new FormulaireView(clientVM, prospectVM,
+                FormulaireView formulaireView = new FormulaireView(clientVM, prospectVM, contratVM,
                         true, client.getId(), "Modifier", "accueil");
                 formulaireView.setVisible(true);
                 this.dispose();

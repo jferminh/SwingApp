@@ -4,12 +4,11 @@ import main.com.julio.model.Client;
 import main.com.julio.model.Prospect;
 import main.com.julio.util.DisplayDialog;
 import main.com.julio.viewmodel.ClientViewModel;
+import main.com.julio.viewmodel.ContratViewModel;
 import main.com.julio.viewmodel.ProspectViewModel;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.util.List;
 import java.util.logging.Level;
 
@@ -18,6 +17,7 @@ import static main.com.julio.service.LoggingService.LOGGER;
 public class AccueilView extends JFrame {
     private ClientViewModel clientVM;
     private ProspectViewModel prospectVM;
+    private ContratViewModel contratVM;
 
     private JLabel titre;
     private JRadioButton rbClients;
@@ -31,9 +31,10 @@ public class AccueilView extends JFrame {
     private String currentAction = null;
     private final String origin = "accueil";
 
-    public AccueilView(ClientViewModel clientVM, ProspectViewModel prospectVM) {
+    public AccueilView(ClientViewModel clientVM, ProspectViewModel prospectVM, ContratViewModel contratVM) {
         this.clientVM = clientVM;
         this.prospectVM = prospectVM;
+        this.contratVM = contratVM;
 
         initComponents();
     }
@@ -209,7 +210,7 @@ public class AccueilView extends JFrame {
     private void onCreer() {
         boolean clients = isClientSelected();
         Integer id = null;
-        FormulaireView form = new FormulaireView(clientVM, prospectVM, clients, id, "Créer", origin);
+        FormulaireView form = new FormulaireView(clientVM, prospectVM, contratVM, clients, id, "Créer", origin);
         form.setVisible(true);
         this.dispose();
     }
@@ -303,11 +304,11 @@ public class AccueilView extends JFrame {
 
     private void handleModifier(Object selected) {
         if (selected instanceof Client c) {
-            FormulaireView form = new FormulaireView(clientVM, prospectVM, true, c.getId(), "Modifier", origin);
+            FormulaireView form = new FormulaireView(clientVM, prospectVM, contratVM, true, c.getId(), "Modifier", origin);
             form.setVisible(true);
             this.dispose();
         } else if (selected instanceof Prospect p) {
-            FormulaireView form = new FormulaireView(clientVM, prospectVM, false, p.getId(), "Modifier", origin);
+            FormulaireView form = new FormulaireView(clientVM, prospectVM, contratVM, false, p.getId(), "Modifier", origin);
             form.setVisible(true);
             this.dispose();
         }
@@ -315,11 +316,11 @@ public class AccueilView extends JFrame {
 
     private void handleSupprimer(Object selected) {
         if (selected instanceof Client c) {
-            FormulaireView form = new FormulaireView(clientVM, prospectVM, true, c.getId(), "Supprimer", origin);
+            FormulaireView form = new FormulaireView(clientVM, prospectVM, contratVM, true, c.getId(), "Supprimer", origin);
             form.setVisible(true);
             this.dispose();
         } else if (selected instanceof Prospect p) {
-            FormulaireView form = new FormulaireView(clientVM, prospectVM, false, p.getId(), "Supprimer", origin);
+            FormulaireView form = new FormulaireView(clientVM, prospectVM, contratVM, false, p.getId(), "Supprimer", origin);
             form.setVisible(true);
             this.dispose();
         }
@@ -333,19 +334,19 @@ public class AccueilView extends JFrame {
             );
             return;
         }
-        ListeContratsView contratsView = new ListeContratsView(clientVM, prospectVM, c, origin);
+        ListeContratsView contratsView = new ListeContratsView(clientVM, prospectVM, contratVM, c, origin);
         contratsView.setVisible(true);
         this.dispose();
     }
 
     private void ouvrirGestionClients() {
-        ListeView listeClients = new ListeView(clientVM, prospectVM, true);
+        ListeView listeClients = new ListeView(clientVM, prospectVM, contratVM, true);
         listeClients.setVisible(true);
         this.dispose();
     }
 
     private void ouvrirGestionProspects() {
-        ListeView listeProspects = new ListeView(clientVM, prospectVM, false);
+        ListeView listeProspects = new ListeView(clientVM, prospectVM, contratVM, false);
         listeProspects.setVisible(true);
         this.dispose();
     }
