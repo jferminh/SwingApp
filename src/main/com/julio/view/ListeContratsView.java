@@ -2,7 +2,6 @@ package main.com.julio.view;
 
 import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Client;
-import main.com.julio.repository.ContratRepository;
 import main.com.julio.util.DisplayDialog;
 import main.com.julio.viewmodel.ClientViewModel;
 import main.com.julio.viewmodel.ContratViewModel;
@@ -16,36 +15,52 @@ import java.util.logging.Level;
 import static main.com.julio.service.LoggingService.LOGGER;
 
 /**
- * Vue pour afficher et gérer les contrats d'un client.
+ * Vue d'affichage et de gestion des contrats d'un client spécifique.
+ * Permet les opérations CRUD sur les contrats associés à un client.
  *
- * @author Votre Nom
+ * @author Julio FERMIN
  * @version 1.0
+ * @since 19/11/2025
  */
 public class ListeContratsView extends JFrame {
-    private ClientViewModel clientVM;
-    private ContratViewModel contratVM;
-    private ProspectViewModel prospectVM;
-    private Client client;
-    private String origin;
 
+    // ViewModels - Pattern MVVM
+    private final ClientViewModel clientVM;
+    private final ContratViewModel contratVM;
+    private final ProspectViewModel prospectVM;
+
+    // Données contextuelles
+    private final Client client;  // Client dont on affiche les contrats
+    private final String origin;  // Vue d'origine pour navigation retour
+
+    // Composants UI
     private JTable table;
     private DefaultTableModel tableModelContrats;
 
-    public ListeContratsView(ClientViewModel clientVM, ProspectViewModel prospectVM, ContratViewModel contratVM, Client client, String origin) {
+    /**
+     * Constructeur initialisant la vue avec le client et ses contrats.
+     *
+     * @param clientVM ViewModel des clients
+     * @param prospectVM ViewModel des prospects
+     * @param contratVM ViewModel des contrats
+     * @param client client dont on affiche les contrats
+     * @param origin identifiant de la vue d'origine ("accueil", "listeview", etc.)
+     */
+    public ListeContratsView(ClientViewModel clientVM, ProspectViewModel prospectVM,
+                             ContratViewModel contratVM, Client client, String origin) {
         this.clientVM = clientVM;
         this.prospectVM = prospectVM;
         this.contratVM = contratVM;
         this.client = client;
         this.origin = origin;
 
-        // Créer le ContratViewModel (nécessite ContratRepository)
-//        ContratRepository contratRepo = new ContratRepository();
-//        this.contratVM = new ContratViewModel(contratRepo, clientVM.clientRepo);
-
         initialiserInterface();
         chargerDonnees();
     }
 
+    /**
+     * Initialise l'interface graphique avec table et boutons d'action.
+     */
     private void initialiserInterface() {
         setTitle("Contrats de " + client.getRaisonSociale());
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -53,11 +68,11 @@ public class ListeContratsView extends JFrame {
         setLocationRelativeTo(null);
         setResizable(false);
 
-        // Panel principal
+        // Panel principal avec BorderLayout
         JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // En-tête avec info client
+        // En-tête: info client (raison sociale, ID, adresse)
         JPanel headerPanel = new JPanel(new GridLayout(2, 1, 5, 5));
         JLabel titre = new JLabel("Contrats de " + client.getRaisonSociale());
         titre.setFont(new Font("Arial", Font.BOLD, 18));
@@ -70,17 +85,17 @@ public class ListeContratsView extends JFrame {
 
         mainPanel.add(headerPanel, BorderLayout.NORTH);
 
-        // Table des contrats
+        // Table des contrats avec modèle chargé depuis ViewModel
         tableModelContrats = contratVM.construireTableModel(client.getId());
         table = new JTable(tableModelContrats);
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);  // Une seule ligne à la fois
         table.setFont(new Font("Arial", Font.PLAIN, 12));
         table.setRowHeight(25);
 
         JScrollPane scrollPane = new JScrollPane(table);
         mainPanel.add(scrollPane, BorderLayout.CENTER);
 
-        // Panel boutons
+        // Panel boutons: CRUD + Navigation
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
 
         JButton btnCreer = new JButton("Créer Contrat");
@@ -116,15 +131,23 @@ public class ListeContratsView extends JFrame {
         add(mainPanel);
     }
 
+    /**
+     * Recharge les données de la table depuis le ViewModel.
+     */
     private void chargerDonnees() {
         tableModelContrats = contratVM.construireTableModel(client.getId());
         table.setModel(tableModelContrats);
     }
 
+    /**
+     * Affiche un dialogue pour créer un nouveau contrat.
+     * Valide les données et rafraîchit la table en cas de succès.
+     */
     private void creerContrat() {
         JTextField txtNom = new JTextField(20);
         JTextField txtMontant = new JTextField(20);
 
+        // Panel de saisie avec GridLayout
         JPanel panel = new JPanel(new GridLayout(2, 2, 5, 5));
         panel.add(new JLabel("Nom du contrat :"));
         panel.add(txtNom);
@@ -142,26 +165,24 @@ public class ListeContratsView extends JFrame {
                 contratVM.creerContrat(client.getId(), nom, montant);
                 JOptionPane.showMessageDialog(this, "Contrat créé avec succès!",
                         "Succès", JOptionPane.INFORMATION_MESSAGE);
-                chargerDonnees();
+                chargerDonnees();  // Rafraîchir table
 
             } catch (ValidationException ve) {
-                DisplayDialog.messageError(
-                        "Erreur d'entrée", ve.getMessage()
-                );
+                DisplayDialog.messageError("Erreur d'entrée", ve.getMessage());
             } catch (NumberFormatException nfe) {
-                DisplayDialog.messageError(
-                        "Erreur d'entrée",
-                        "Erreur de format numérique. Vérifiez vos saisies."
-                );
+                DisplayDialog.messageError("Erreur d'entrée",
+                        "Erreur de format numérique. Vérifiez vos saisies.");
             } catch (Exception e) {
-                DisplayDialog.messageError(
-                        "Erreur", e.getMessage()
-                );
+                DisplayDialog.messageError("Erreur", e.getMessage());
                 LOGGER.log(Level.SEVERE, e.getMessage(), e);
             }
         }
     }
 
+    /**
+     * Affiche un dialogue pour modifier le contrat sélectionné.
+     * Pré-remplit les champs avec les valeurs actuelles.
+     */
     private void modifierContrat() {
         int selectedRow = table.getSelectedRow();
         if (selectedRow == -1) {
@@ -170,10 +191,12 @@ public class ListeContratsView extends JFrame {
             return;
         }
 
+        // Récupération des données de la ligne sélectionnée
         int contratId = (int) table.getValueAt(selectedRow, 0);
         String nomActuel = (String) table.getValueAt(selectedRow, 1);
         String montantActuel = (String) table.getValueAt(selectedRow, 2);
 
+        // Pré-remplissage des champs
         JTextField txtNom = new JTextField(nomActuel, 20);
         JTextField txtMontant = new JTextField(montantActuel, 20);
 
@@ -189,35 +212,30 @@ public class ListeContratsView extends JFrame {
         if (result == JOptionPane.OK_OPTION) {
             try {
                 String nom = txtNom.getText().trim();
+                // Remplacer virgule par point pour parsing décimal
                 double montant = Double.parseDouble(
                         txtMontant.getText().trim().replace(",", ".")
                 );
 
                 contratVM.modifierContrat(contratId, nom, montant);
-                DisplayDialog.messageInfo(
-                        "Succès",
-                        "Contrat modifié avec succès!"
-                );
+                DisplayDialog.messageInfo("Succès", "Contrat modifié avec succès!");
                 chargerDonnees();
 
             } catch (ValidationException ve) {
-                DisplayDialog.messageError(
-                        "Erreur d'entrée", ve.getMessage()
-                );
+                DisplayDialog.messageError("Erreur d'entrée", ve.getMessage());
             } catch (NumberFormatException nfe) {
-                DisplayDialog.messageError(
-                        "Erreur d'entrée",
-                        "Veuillez saisir des chiffres."
-                );
+                DisplayDialog.messageError("Erreur d'entrée",
+                        "Veuillez saisir des chiffres.");
             } catch (Exception e) {
-                DisplayDialog.messageError(
-                        "Erreur", e.getMessage()
-                );
+                DisplayDialog.messageError("Erreur", e.getMessage());
                 LOGGER.log(Level.SEVERE, e.getMessage(), e);
             }
         }
     }
 
+    /**
+     * Supprime le contrat sélectionné après confirmation.
+     */
     private void supprimerContrat() {
         int selectedRow = table.getSelectedRow();
         if (selectedRow == -1) {
@@ -229,6 +247,7 @@ public class ListeContratsView extends JFrame {
         int contratId = (int) table.getValueAt(selectedRow, 0);
         String nom = (String) table.getValueAt(selectedRow, 1);
 
+        // Dialogue de confirmation
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Êtes-vous sûr de vouloir supprimer le contrat : " + nom + " ?",
                 "Confirmation", JOptionPane.YES_NO_OPTION);
@@ -237,21 +256,20 @@ public class ListeContratsView extends JFrame {
             boolean success = contratVM.supprimerContrat(contratId);
 
             if (success) {
-                DisplayDialog.messageInfo(
-                        "Succès",
-                        "Contrat supprimé avec succès!"
-                );
+                DisplayDialog.messageInfo("Succès", "Contrat supprimé avec succès!");
                 chargerDonnees();
             } else {
-                DisplayDialog.messageError(
-                        "Erreur",
-                        "Erreur lors de la suppression!"
-                );
+                DisplayDialog.messageError("Erreur", "Erreur lors de la suppression!");
             }
         }
     }
 
+    /**
+     * Retourne à la vue d'origine selon le paramètre origin.
+     * Gère la navigation contextuelle (accueil, listeview, formulaire).
+     */
     private void retour() {
+        // Switch sur l'origine pour navigation contextuelle
         switch (origin) {
             case "accueil" -> {
                 AccueilView accueilView = new AccueilView(clientVM, prospectVM, contratVM);
@@ -264,6 +282,7 @@ public class ListeContratsView extends JFrame {
                 this.dispose();
             }
             default -> {
+                // Retour au formulaire de modification du client
                 FormulaireView formulaireView = new FormulaireView(clientVM, prospectVM, contratVM,
                         true, client.getId(), "Modifier", "accueil");
                 formulaireView.setVisible(true);
