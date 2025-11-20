@@ -16,11 +16,11 @@ import java.time.LocalDate;
  * </p>
  * <p>
  * Contraintes métier :
+ * </p>
  * <ul>
  *   <li>La date de prospection est obligatoire</li>
  *   <li>Le niveau d'intérêt (intéressé) est obligatoire</li>
  * </ul>
- * </p>
  *
  * @author Julio FERMIN
  * @version 1.0

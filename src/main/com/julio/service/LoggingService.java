@@ -57,13 +57,13 @@ public class LoggingService {
      * <p>
      * Cette méthode doit être appelée au démarrage de l'application, généralement
      * dans la méthode {@code main()} ou dans un bloc d'initialisation. Elle configure :
+     * </p>
      * <ol>
      *   <li>Un {@link FileHandler} pointant vers {@code logs/application.log}</li>
      *   <li>Le mode append (true) pour conserver l'historique des logs</li>
      *   <li>Le formateur personnalisé {@link FormatterLog}</li>
      *   <li>La désactivation des handlers parents pour éviter les logs en double</li>
      * </ol>
-     * </p>
      *
      * <p><b>Note importante :</b></p>
      * <ul>

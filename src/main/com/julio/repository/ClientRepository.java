@@ -114,13 +114,13 @@ public class ClientRepository {
      * <p>
      * Cette méthode effectue une suppression en cascade en trois étapes pour
      * garantir l'intégrité référentielle :
+     * </p>
      * <ol>
      *   <li>Récupère tous les contrats associés au client via {@link ContratRepository#findByClientId(int)}</li>
      *   <li>Supprime chaque contrat du {@link ContratRepository}</li>
      *   <li>Nettoie la liste des contrats dans l'objet Client lui-même</li>
      *   <li>Supprime finalement le client de la collection</li>
      * </ol>
-     * </p>
      * <p>
      * <b>Note importante :</b> L'utilisation de {@code new ArrayList<>(collection)} lors des
      * itérations évite les {@link java.util.ConcurrentModificationException} qui se produiraient
@@ -183,11 +183,13 @@ public class ClientRepository {
      * Initialise le repository avec des données de démonstration.
      * <p>
      * Crée 3 clients fictifs avec leurs adresses et contrats associés :
+     * </p>
      * <ul>
      *   <li><b>IBM</b> (Nancy) - CA: 5 000€, 10 employés, 2 contrats</li>
      *   <li><b>Apple</b> (Schoelcher) - CA: 50 000€, 100 employés, 3 contrats</li>
      *   <li><b>Microsoft</b> (Frouard) - CA: 500 000€, 1000 employés, 1 contrat</li>
      * </ul>
+     * <p>
      * Cette méthode est appelée automatiquement par le constructeur.
      * </p>
      *

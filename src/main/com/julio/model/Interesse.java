@@ -9,11 +9,11 @@ package main.com.julio.model;
  * </p>
  * <p>
  * Valeurs possibles :
+ * </p>
  * <ul>
  *   <li>{@link #OUI} - Le prospect a manifesté un intérêt</li>
  *   <li>{@link #NON} - Le prospect n'a pas manifesté d'intérêt</li>
  * </ul>
- * </p>
  *
  * @author Julio FERMIN
  * @version 1.0

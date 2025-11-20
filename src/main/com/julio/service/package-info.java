@@ -21,10 +21,12 @@
  * <h2>Architecture en couches</h2>
  * <p>
  * Les services constituent la couche métier de l'application, située entre :
+ * </p>
  * <ul>
  *   <li>La couche présentation (interfaces utilisateur)</li>
  *   <li>La couche persistance (repositories)</li>
  * </ul>
+ * <p>
  * Ils orchestrent les opérations métier, valident les données et gèrent
  * les transactions entre les différents repositories.
  * </p>

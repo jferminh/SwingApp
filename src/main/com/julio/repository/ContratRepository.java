@@ -111,12 +111,12 @@ public class ContratRepository {
      * Filtre les contrats par l'identifiant du client et retourne une nouvelle
      * liste contenant uniquement les contrats correspondants. Cette méthode est
      * essentielle pour :
+     * </p>
      * <ul>
      *   <li>Afficher les contrats d'un client dans l'interface utilisateur</li>
      *   <li>Effectuer la suppression en cascade lors de la suppression d'un client</li>
      *   <li>Calculer des statistiques par client (montants totaux, nombre de contrats)</li>
      * </ul>
-     * </p>
      *
      * @param clientId identifiant du client dont on recherche les contrats
      * @return liste des contrats associés au client (vide si aucun contrat trouvé)

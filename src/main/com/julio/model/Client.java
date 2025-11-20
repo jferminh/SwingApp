@@ -15,11 +15,11 @@ import java.util.List;
  * </p>
  * <p>
  * Contraintes métier :
+ * </p>
  * <ul>
  *   <li>Le chiffre d'affaires doit être supérieur ou égal à 200</li>
  *   <li>Le nombre d'employés doit être supérieur ou égal à 1</li>
  * </ul>
- * </p>
  *
  * @author Julio FERMIN
  * @version 1.0

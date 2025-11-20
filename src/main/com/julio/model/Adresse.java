@@ -13,13 +13,13 @@ import main.com.julio.service.ValidationService;
  * </p>
  * <p>
  * Contraintes métier :
+ * </p>
  * <ul>
  *   <li>Le numéro de rue est obligatoire (non vide)</li>
  *   <li>Le nom de rue est obligatoire (non vide)</li>
  *   <li>Le code postal doit contenir exactement 5 chiffres</li>
  *   <li>La ville est obligatoire (non vide)</li>
  * </ul>
- * </p>
  *
  * @author Julio FERMIN
  * @version 1.0

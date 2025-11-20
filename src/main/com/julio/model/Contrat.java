@@ -12,12 +12,12 @@ import main.com.julio.service.ValidationService;
  * </p>
  * <p>
  * Contraintes métier :
+ * </p>
  * <ul>
  *   <li>L'ID du client doit être strictement positif</li>
  *   <li>Le nom du contrat est obligatoire (non vide)</li>
  *   <li>Le montant doit être strictement positif</li>
  * </ul>
- * </p>
  *
  * @author Julio FERMIN
  * @version 1.0

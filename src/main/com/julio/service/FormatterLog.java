@@ -45,6 +45,7 @@ public class FormatterLog extends Formatter {
      * Formate un enregistrement de log selon le format personnalisé de l'application.
      * <p>
      * Construit une chaîne de caractères structurée contenant :
+     * </p>
      * <ol>
      *   <li><b>Date/Heure</b> : horodatage au format "dd/MM/yyyy HH:mm:ss"</li>
      *   <li><b>Niveau</b> : gravité du log (INFO, WARNING, SEVERE, etc.)</li>
@@ -52,6 +53,7 @@ public class FormatterLog extends Formatter {
      *   <li><b>Classe</b> : nom complet de la classe source de l'événement</li>
      *   <li><b>Méthode</b> : nom de la méthode source de l'événement</li>
      * </ol>
+     * <p>
      * Chaque entrée se termine par un retour à la ligne pour faciliter la lecture
      * dans les fichiers de log.
      * </p>
