@@ -40,7 +40,7 @@ public class ClientRepository {
     /**
      * Référence vers le repository des contrats pour gérer les associations
      */
-    private ContratRepository contratRepo;
+    private final ContratRepository contratRepo;
 
     /**
      * Comparateur statique pour trier les clients par raison sociale.
@@ -131,7 +131,7 @@ public class ClientRepository {
      * @return true si le client a été trouvé et supprimé (avec ses contrats), false si aucun client ne correspond
      * @see ContratRepository#findByClientId(int)
      * @see ContratRepository#delete(int)
-     * @see Client#supprimerContrat(Contrat)
+     * @see Client#supprimerContrat (Contrat)
      */
     public boolean delete(int id) {
         Client existing = findById(id);
