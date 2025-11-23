@@ -231,7 +231,7 @@ public class FormulaireView extends JFrame {
             buttonPanel.add(btnVoirContrats);
         }
 
-        JButton btnAnnuler = new JButton("Annuler");
+        JButton btnAnnuler = new JButton("Retourner");
         btnAnnuler.setPreferredSize(new Dimension(100, 28));
         btnAnnuler.addActionListener(e -> retour());
         buttonPanel.add(btnAnnuler);

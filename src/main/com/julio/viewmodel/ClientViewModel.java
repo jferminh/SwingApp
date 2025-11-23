@@ -89,7 +89,7 @@ public class ClientViewModel {
             clientRepo.add(client);
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, e.getMessage(), e);
-            throw e;  // Propagation pour affichage dans vue
+            throw e;  // Propagation pour affichage dans la vue
         }
     }
 

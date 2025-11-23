@@ -1,0 +1,143 @@
+@startuml
+title Diagramme de classes Métier – ECF Gestion Clients/Prospects [AFPA 2025]
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 14
+skinparam classAttributeFontSize 12
+skinparam noteFontSize 11
+
+' Énumération pour l'intérêt du prospect
+enum Interesse {
+  OUI
+  NON
+}
+
+' Valeur Adresse
+class Adresse {
+    {static} - static compteurAdresses : int
+  - id : int
+  - numeroRue : String
+  - rue : String
+  - codePostal : String
+  - ville : String
+  + Adresse(numeroRue: String, rue: String, codePostal: String, ville: String)
+  + {static} resetCompteur() : void
+  + toString() : String
+}
+
+' Classe abstraite commune
+abstract class Societe {
+  - id : int
+  - raisonSociale : String
+  - adresse : Adresse
+  - telephone : String
+  - email : String
+  - commentaires : String
+  + Societe(raisonSociale: String, adresse: Adresse, telephone: String,
+  email: String, commentaires: String)
+  + {abstract} getTypeSociete() : String
+}
+
+' Spécialisations
+class Client extends Societe {
+  - {static} compteurId : int
+  - chiffreAffaires : double
+  - nbEmployes : int
+  - contrats : List<Contrat>
+  + Client(raisonSociale: String, adresse: Adresse, telephone: String,
+  email: String, chiffreAffaires: double, nbEmployes: int)
+  + ajouterContrat(c: Contrat) : void
+  + supprimerContrat(c: Contrat) : void
+  + getTypeSociete() : String
+  + toString() : String
+  + {static} resetCompteur() : void
+}
+
+class Prospect extends Societe {
+  - {static} compteurId : int
+  - dateProspection : LocalDate
+  - interesse : String
+  + Prospect(raisonSociale: String, adresse: Adresse, telephone: String,
+  email: String, dateProspection: LocalDate, interesse: String)
+  + getTypeSociete() : String
+  + toString() : String
+  + {static} resetCompteur() : void
+}
+
+' Contrat
+class Contrat {
+  - {static} compteurId : int
+  - id : int
+  - clientId : int
+  - nom : String
+  - montant : double
+  + Contrat(clientId: int, nom: String, montant: double)
+  + toString() : String
+  + {static} resetCompteur() : void
+}
+
+' Liste Clients
+class ListClients<Client> {
+  + {static} static clients : ArrayList<Client>
+  + {static} static trierParRaisonSociale : Client
+  '  + {static} static trierParRaisonSociale(raison: String) : Client
+
+}
+
+' Liste Prospects
+class ListProspects<Prospect> {
+  + {static} static prospects : ArrayList<Prospect>
+  + {static} static trierParRaisonSociale : Prospect
+  '  + {static} static trierParRaisonSociale(raison: String) : Prospect
+'   + {static} static trierParDateProspection(date: LocalDate) : Prospect
+}
+
+' Liste Contrats
+' class ListContrats<Contrat> {
+'     + {static} static contrats : ArrayList<Contrat>
+' }
+
+
+' Relations
+Societe "1" *-- "1" Adresse : composition
+Client "1" --> "0..*" Contrat : possède >
+Contrat "1" --> "1" Client : client (via clientId)
+
+' Contraintes et notes
+note top of Adresse
+- Tous les champs obligatoires
+- codePostal : Regex [0-9]{5}
+end note
+
+note bottom of Societe
+- raisonSociale : obligatoire et UNIQUE
+  (unicité globale sur Clients + Prospects)
+- telephone : obligatoire + Regex
+- email : obligatoire + Regex
+- commentaires : optionnel
+end note
+
+note right of Client
+- chiffreAffaires > 200 (obligatoire)
+- nbEmployes > 0 (obligatoire)
+- contrats listés dans une vue dédiée
+end note
+
+note right of Prospect
+- dateProspection : format jj/mm/aaaa (DateTimeFormatter)
+- interesse ∈ {OUI, NON} (Enum Interesse)
+end note
+
+note bottom of Contrat
+- clientId : obligatoire (référence Client existant)
+- nom : obligatoire
+- montant : obligatoire
+end note
+
+' Règles d’identifiants (globales)
+note top of Societe
+Id auto-incrémenté, commence à 1 par classe,
+visible mais non modifiable par l’utilisateur.
+(Applique à Adresse, Societe, Client, Prospect, Contrat)
+end note
+@enduml
