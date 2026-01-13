@@ -2,9 +2,6 @@ package main.com.julio.model;
 
 import main.com.julio.exception.ValidationException;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Classe représentant un client dans le système de gestion.
  * <p>
@@ -30,7 +27,7 @@ import java.util.List;
 public class Client extends Societe {
 
     /** Compteur statique pour générer automatiquement les identifiants des clients */
-    private static int compteurId = 1;
+//    private static int compteurId = 1;
 
     /** Chiffre d'affaires du client en euros (minimum 200) */
     private long chiffreAffaires;
@@ -39,7 +36,7 @@ public class Client extends Societe {
     private int nbEmployes;
 
     /** Liste des contrats associés au client */
-    private List<Contrat> contrats;
+//    private List<Contrat> contrats;
 
     /**
      * Constructeur principal de la classe Client.
@@ -61,11 +58,10 @@ public class Client extends Societe {
     public Client(String raisonSociale, Adresse adresse, String telephone,
                   String email, String commentaires, long chiffreAffaires,
                   int nbEmployes) throws ValidationException {
-        super(compteurId, raisonSociale, adresse, telephone, email, commentaires);
+        super(null, raisonSociale, adresse, telephone, email, commentaires);
         setChiffreAffaires(chiffreAffaires);
         setNbEmployes(nbEmployes);
-        compteurId = compteurId + 1;
-        this.contrats = new ArrayList<>();
+//        this.contrats = new ArrayList<>();
     }
 
     public long getChiffreAffaires() {
@@ -82,9 +78,9 @@ public class Client extends Societe {
      *
      * @return une nouvelle liste contenant les contrats du client
      */
-    public List<Contrat> getContrats() {
-        return new ArrayList<>(contrats);
-    }
+//    public List<Contrat> getContrats() {
+//        return new ArrayList<>(contrats);
+//    }
 
     /**
      * Modifie le chiffre d'affaires du client avec validation métier.
@@ -119,11 +115,11 @@ public class Client extends Societe {
      *
      * @param contrat le contrat à ajouter
      */
-    public void ajouterContrat(Contrat contrat) {
-        if (contrat != null && !contrats.contains(contrat)) {
-            contrats.add(contrat);
-        }
-    }
+//    public void ajouterContrat(Contrat contrat) {
+//        if (contrat != null && !contrats.contains(contrat)) {
+//            contrats.add(contrat);
+//        }
+//    }
 
     /**
      * Supprime un contrat de la liste des contrats du client.
@@ -133,9 +129,9 @@ public class Client extends Societe {
      *
      * @param contrat le contrat à supprimer
      */
-    public void supprimerContrat(Contrat contrat) {
-        contrats.remove(contrat);
-    }
+//    public void supprimerContrat(Contrat contrat) {
+//        contrats.remove(contrat);
+//    }
 
     /**
      * Réinitialise le compteur d'identifiants des clients à 1.
@@ -143,9 +139,9 @@ public class Client extends Societe {
      * Cette méthode statique est généralement utilisée pour les tests.
      * </p>
      */
-    public static void resetCompteur() {
-        compteurId = 1;
-    }
+//    public static void resetCompteur() {
+//        compteurId = 1;
+//    }
 
     /**
      * Retourne une représentation textuelle du client.

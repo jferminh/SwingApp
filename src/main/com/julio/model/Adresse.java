@@ -32,12 +32,13 @@ public class Adresse {
     private static int compteurId = 1;
 
     /** Identifiant unique de l'adresse */
-    private int id;
+//    private int id;
+    private Integer id;
 
-    /** Numéro dans la rue (peut inclure bis, ter, etc.) - obligatoire */
+    /** Numéro dans la rue (peut inclure bis, ter, etc.). Obligatoire */
     private String numeroRue;
 
-    /** Nom de la voie (rue, avenue, boulevard, etc.) - obligatoire */
+    /** Nom de la voie (rue, avenue, boulevard, etc.). Obligatoire */
     private String nomRue;
 
     /** Code postal français à 5 chiffres - obligatoire et validé */
@@ -61,7 +62,7 @@ public class Adresse {
      * @throws ValidationException si une des validations échoue
      */
     public Adresse(String numeroRue, String nomRue, String codePostal, String ville) throws ValidationException {
-        this.id = compteurId++;
+        this.id = null; // ID null avant insertion en BDD
         setNumeroRue(numeroRue);
         setNomRue(nomRue);
         setCodePostal(codePostal);
@@ -72,7 +73,7 @@ public class Adresse {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
@@ -121,7 +122,7 @@ public class Adresse {
     /**
      * Modifie le code postal avec validation du format français.
      * <p>
-     * Le code postal doit contenir exactement 5 chiffres consécutifs.
+     * Le code postal doit contenir exactement cinq chiffres consécutifs.
      * La validation est effectuée via {@link ValidationService#isValidCodePostal(String)}.
      * </p>
      *

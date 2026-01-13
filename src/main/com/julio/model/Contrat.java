@@ -15,7 +15,7 @@ import main.com.julio.service.ValidationService;
  * </p>
  * <ul>
  *   <li>L'ID du client doit être strictement positif</li>
- *   <li>Le nom du contrat est obligatoire (non vide)</li>
+ *   <li>Le nom du contrat est obligatoire (non vide).</li>
  *   <li>Le montant doit être strictement positif</li>
  * </ul>
  *
@@ -30,10 +30,10 @@ public class Contrat {
     private static int compteurId = 1;
 
     /** Identifiant unique du contrat */
-    private int id;
+    private Integer id;
 
     /** Identifiant du client auquel le contrat est associé (doit être > 0) */
-    private int clientId;
+    private Integer clientId;
 
     /** Nom ou désignation du contrat (obligatoire) */
     private String nomContrat;
@@ -54,18 +54,18 @@ public class Contrat {
      * @param montant montant financier du contrat en euros (doit être > 0)
      * @throws ValidationException si une des validations échoue
      */
-    public Contrat(int clientId, String nomContrat, double montant) throws ValidationException {
+    public Contrat(Integer clientId, String nomContrat, double montant) throws ValidationException {
+        this.id = null;
         setClientId(clientId);
         setNomContrat(nomContrat);
         setMontant(montant);
-        this.id = compteurId++;
     }
 
-    public int getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
@@ -78,9 +78,9 @@ public class Contrat {
      * L'ID du client doit être strictement positif (supérieur à zéro).
      *
      * @param clientId le nouvel identifiant du client
-     * @throws ValidationException si l'ID du client est inférieur ou égal à 0
+     * @throws ValidationException si l'ID du client est inférieur ou égal à zero.
      */
-    public void setClientId(int clientId) throws ValidationException {
+    public void setClientId(Integer clientId) throws ValidationException {
         if (clientId <= 0) {
             throw new ValidationException("L'ID du client est obligatoire.");
         }
@@ -115,7 +115,7 @@ public class Contrat {
      * Le montant doit être strictement positif (supérieur à zéro).
      *
      * @param montant le nouveau montant en euros
-     * @throws ValidationException si le montant est inférieur ou égal à 0
+     * @throws ValidationException si le montant est inférieur ou égal à zero.
      */
     public void setMontant(double montant) throws ValidationException {
         if (montant <= 0) {

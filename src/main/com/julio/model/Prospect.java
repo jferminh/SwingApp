@@ -59,10 +59,10 @@ public class Prospect extends Societe {
     public Prospect(String raisonSociale, Adresse adresse, String telephone,
                     String email, String commentaires, LocalDate dateProspection,
                     Interesse interesse) throws ValidationException {
-        super(compteurId, raisonSociale, adresse, telephone, email, commentaires);
+        super(null, raisonSociale, adresse, telephone, email, commentaires);
         setDateProspection(dateProspection);
         setInteresse(interesse);
-        compteurId++;
+//        compteurId++;
     }
 
     public LocalDate getDateProspection() {

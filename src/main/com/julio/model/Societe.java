@@ -14,7 +14,7 @@ import main.com.julio.service.ValidationService;
  */
 public abstract class Societe {
 
-    private int id;
+    private Integer id;
     private String raisonSociale;
     private Adresse adresse;
     private String telephone;
@@ -33,7 +33,7 @@ public abstract class Societe {
      * @param commentaires notes additionnelles (peut être null ou vide)
      * @throws ValidationException si une des validations échoue
      */
-    public Societe(int id, String raisonSociale, Adresse adresse, String telephone,
+    public Societe(Integer id, String raisonSociale, Adresse adresse, String telephone,
                    String email, String commentaires) throws ValidationException {
         this.id = id;
         setRaisonSociale(raisonSociale);
@@ -43,7 +43,7 @@ public abstract class Societe {
         this.commentaires = commentaires;
     }
 
-    public int getId() {
+    public Integer getId() {
         return id;
     }
 
@@ -72,7 +72,7 @@ public abstract class Societe {
      *
      * @param id le nouvel identifiant
      */
-    public void setId(int id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
@@ -152,4 +152,16 @@ public abstract class Societe {
      */
     public abstract String getTypeSociete();
 
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder("Societe{");
+        sb.append("id=").append(id);
+        sb.append(", raisonSociale='").append(raisonSociale).append('\'');
+        sb.append(", adresse=").append(adresse);
+        sb.append(", telephone='").append(telephone).append('\'');
+        sb.append(", email='").append(email).append('\'');
+        sb.append(", commentaires='").append(commentaires).append('\'');
+        sb.append('}');
+        return sb.toString();
+    }
 }
