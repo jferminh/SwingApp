@@ -1,18 +1,25 @@
 package main.com.julio;
 
+import main.com.julio.dao.AdresseDAO;
 import main.com.julio.dao.DatabaseConnexion;
+import main.com.julio.service.LoggingService;
 
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.logging.Level;
+
+import static main.com.julio.service.LoggingService.LOGGER;
 
 /**
  * Classe de test pour vérifier la connexion à la base de données.
  */
 public class TestDatabaseConnection {
-    static void main(String[] args) {
+    static void main(String[] args) throws IOException {
+        LoggingService.intFichierLog();
+        LOGGER.log(Level.INFO, "Démarrage de la application");
         System.out.println("Test de connexion à la base de données MySQL\n");
 
         try {
@@ -63,8 +70,6 @@ public class TestDatabaseConnection {
             System.err.println("   - database.properties est correctement configuré");
             System.err.println("   - La base ecf_dao existe");
             e.printStackTrace();
-        } catch (IOException | ClassNotFoundException e) {
-            throw new RuntimeException(e);
         }
     }
 }

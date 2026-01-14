@@ -1,7 +1,5 @@
 package main.com.julio.dao;
 
-import main.com.julio.viewmodel.ClientViewModel;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Connection;
@@ -9,11 +7,12 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import static main.com.julio.service.LoggingService.LOGGER;
 
 /**
  * Classe singleton pour gérer la connexion à la base de données MySQL.
- *
+ * <p>
  * Cette classe implémente le design pattern Singleton pour garantir qu'une seule
  * instance de connexion existe dans toute l'application. Elle charge la configuration
  * depuis le fichier database.properties et gère les erreurs de connexion avec des logs.
@@ -23,9 +22,6 @@ import java.util.logging.Logger;
  * @since 13/01/2026
  */
 public class DatabaseConnexion {
-    // Logger pour la gestion des logs
-    private static final Logger LOGGER = Logger.getLogger(DatabaseConnexion.class.getName());
-
     // Instance unique (Singleton)
     private static DatabaseConnexion instance;
 
@@ -118,7 +114,7 @@ public class DatabaseConnexion {
      * @return l'instance unique de DatabaseConnection
      * @throws SQLException si la connexion échoue
      */
-    public static DatabaseConnexion getInstance() throws SQLException, IOException, ClassNotFoundException {
+    public static DatabaseConnexion getInstance() throws SQLException {
         try {
             if (instance == null) {
                 synchronized (DatabaseConnexion.class) {
@@ -133,7 +129,7 @@ public class DatabaseConnexion {
                     instance.connect();
                 }
             }
-        } catch (IOException | ClassNotFoundException e) {
+        } catch (SQLException | IOException | ClassNotFoundException e) {
             LOGGER.log(Level.SEVERE, "Impossible de créer l'instance DatabaseConnexion", e);
             throw new SQLException("Erreur initialization DatabaseConnexion", e);
         }
@@ -157,6 +153,7 @@ public class DatabaseConnexion {
             }
         } catch (SQLException ex) {
             LOGGER.log(Level.SEVERE, "Erreur lors de la fermeture de la connexion", ex);
+            throw ex;
         }
     }
 

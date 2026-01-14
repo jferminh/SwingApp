@@ -69,7 +69,7 @@ public class Adresse {
         setVille(ville);
     }
 
-    public int getId() {
+    public Integer getId() {
         return id;
     }
 
