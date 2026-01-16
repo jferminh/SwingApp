@@ -1,5 +1,6 @@
 package main.com.julio.repository;
 
+import main.com.julio.dao.ClientDAO;
 import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Adresse;
 import main.com.julio.model.Client;
@@ -67,7 +68,7 @@ public class ClientRepository {
     public ClientRepository(ContratRepository contratRepo) throws ValidationException {
         this.clients = new ArrayList<>();
         this.contratRepo = contratRepo;
-        initialiserDonneesDemo();
+//        initialiserDonneesDemo();
     }
 
     public List<Client> getClients() {
@@ -131,15 +132,14 @@ public class ClientRepository {
      * @return true si le client a été trouvé et supprimé (avec ses contrats), false si aucun client ne correspond
      * @see ContratRepository#findByClientId(int)
      * @see ContratRepository#delete(int)
-     * @see Client#supprimerContrat (Contrat)
      */
     public boolean delete(int id) {
         Client existing = findById(id);
 
         // Nettoyage de la liste des contrats dans l'objet Client
-        for (Contrat ct : new ArrayList<>(existing.getContrats())) {
-            existing.supprimerContrat(ct);
-        }
+//        for (Contrat ct : new ArrayList<>(existing.getContrats())) {
+//            existing.supprimerContrat(ct);
+//        }
 
         // Suppression du client
         return clients.removeIf(client -> client.getId() == id);
@@ -175,6 +175,7 @@ public class ClientRepository {
     public List<Client> findAll() {
         List<Client> copy = new ArrayList<>(clients);
         copy.sort(BY_RAISON_SOCIALE);
+//        List<Client> copy =
         return copy;
     }
 
@@ -273,7 +274,7 @@ public class ClientRepository {
      * <ol>
      *   <li>Ajoute le contrat au {@link ContratRepository}</li>
      *   <li>Récupère le client correspondant</li>
-     *   <li>Associe le contrat au client via {@link Client#ajouterContrat(Contrat)}</li>
+     *   <li>Associe le contrat au client via </li>
      * </ol>
      * Cette méthode garantit la cohérence bidirectionnelle entre clients et contrats.
      * </p>
@@ -286,7 +287,7 @@ public class ClientRepository {
             contratRepo.add(ct);
             Client cli = findById(clientId);
             if (ct != null) {
-                cli.ajouterContrat(ct);
+//                cli.ajouterContrat(ct);
             }
         }
     }

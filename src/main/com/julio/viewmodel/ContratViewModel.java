@@ -67,7 +67,7 @@ public class ContratViewModel {
             contratRepo.add(contrat);
 
             // Synchronisation bidirectionnelle: ajout dans liste client
-            client.ajouterContrat(contrat);
+//            client.ajouterContrat(contrat);
 
         } catch (ValidationException ve) {
             throw ve;  // Propagation directe pour affichage vue
@@ -125,7 +125,7 @@ public class ContratViewModel {
             // Synchronisation bidirectionnelle: retrait de la liste client
             Client client = clientRepo.findById(contrat.getClientId());
             if (client != null) {
-                client.supprimerContrat(contrat);
+//                client.supprimerContrat(contrat);
             }
 
             // Suppression du repository

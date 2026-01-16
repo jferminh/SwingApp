@@ -5,7 +5,20 @@ out/
 .kotlin
 *.iml
 /.idea
-logs/application.log
+
+#Logs
+*.log
+logs/
+
+# Fichiers compilés
+*.jar
+
+# Fichiers de configuration sensibles (ne pas versionner les mots de passe)
+database.properties
+
+# Créer un fichier example à la place
+# database.properties.example sera versionné
+
 
 
 ### Eclipse ###

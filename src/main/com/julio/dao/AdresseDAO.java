@@ -173,9 +173,12 @@ public class AdresseDAO {
      * Supprime une adresse de la base de données.
      * Utilise une transaction pour garantir la cohérence.
      *
+     * ATTENTION : En raison de la contrainte ON DELETE RESTRICT, l'adresse ne peut être supprimée
+     * que si aucune société n'y fait référence.
+     *
      * @param id l'identifiant de l'adresse à supprimer
      * @return true si la suppression a réussi, false sinon
-     * @throws SQLException si une erreur survient lors de la suppression
+     * @throws SQLException si une erreur survient ou si des sociétés sont liées à cette adresse
      */
     public boolean delete(Integer id) throws SQLException {
         if (id == null || id <= 0) {
@@ -183,16 +186,36 @@ public class AdresseDAO {
         }
 
         Connection conn = dbConnexion.getConnection();
-        String query = "DELETE FROM adresse WHERE id_adresse = ?";
 
         try {
             // Démarrer la transaction
             conn.setAutoCommit(false);
 
+            // Vérifier s'il existe des sociétés liées à cette adresse
+            String query = "SELECT COUNT(*) FROM societe WHERE adresse_id = ?";
+
             try (PreparedStatement pstmt = conn.prepareStatement(query)) {
                 pstmt.setInt(1, id);
 
-                int rowsAffected = pstmt.executeUpdate();
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next() && rs.getInt(1) > 0) {
+                        int count = rs.getInt(1);
+                        conn.rollback();
+                        String errorMsg = String.format(
+                                "Impossible de supprimer l'adresse ID %d : %d société(s) y sont liées. " +
+                                        "Supprimez d'abord les sociétés associées.", id, count
+                        );
+                        LOGGER.log(Level.SEVERE, errorMsg);
+                        throw new SQLException(errorMsg);
+                    }
+                }
+            }
+            // Supprimer l'adresse
+            String query2 = "DELETE FROM adresse WHERE id_adresse = ?";
+            try (PreparedStatement pstmt2 = conn.prepareStatement(query2)) {
+                pstmt2.setInt(1, id);
+
+                int rowsAffected = pstmt2.executeUpdate();
 
                 if (rowsAffected > 0) {
                     conn.commit();
@@ -216,7 +239,7 @@ public class AdresseDAO {
             try {
                 conn.setAutoCommit(true);
             } catch (SQLException e) {
-                LOGGER.log(Level.SEVERE, "Erreur lors de la connexion", e);
+                LOGGER.log(Level.SEVERE, "Erreur lors de la réactivation de l'autoCommit", e);
             }
         }
     }
