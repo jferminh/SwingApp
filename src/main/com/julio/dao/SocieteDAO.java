@@ -194,10 +194,8 @@ public abstract class SocieteDAO {
 
             int rowsAffected = preparedStatement.executeUpdate();
             if (rowsAffected > 0) {
-//                LOGGER.log(Level.INFO, "Société mise à jour avec l'ID {0}", societe.getId());
                 return true;
             } else {
-//                LOGGER.log(Level.WARNING, "Aucune société trouvée avec l'ID {0}", societe.getId());
                 return false;
             }
         } catch (SQLException e) {

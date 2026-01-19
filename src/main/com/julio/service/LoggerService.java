@@ -1,4 +1,4 @@
-package main.com.julio.util;
+package main.com.julio.service;
 
 import java.io.IOException;
 import java.util.logging.*;
@@ -11,7 +11,7 @@ import java.util.logging.*;
  * @version 2.0
  * @since 15/01/2026
  */
-public class LoggerUtil {
+public class LoggerService {
     private static final String LOG_FILE_PATTERN = "logs/ecf_dao_%u.log";
     private static final int MAX_LOG_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
     private static final int MAX_LOG_FILES = 10;

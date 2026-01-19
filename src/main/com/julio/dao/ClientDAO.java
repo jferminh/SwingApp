@@ -4,6 +4,7 @@ import main.com.julio.exception.DAOException;
 import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Adresse;
 import main.com.julio.model.Client;
+import main.com.julio.model.Contrat;
 import main.com.julio.service.LoggerService;
 import main.com.julio.util.SQLExceptionAnalyzer;
 
@@ -16,28 +17,37 @@ import java.util.logging.Logger;
 /**
  * Classe DAO pour la gestion des clients en base de données.
  * Implémente le pattern Data Access Object (DAO) pour l'entité Client.
+ * <p>
+ * Cette classe gère les opérations CRUD sur les clients et leurs relations
+ * avec les adresses et les contrats, en utilisant des transactions pour
+ * garantir l'intégrité des données.
  *
  * @author Julio FERMIN
  * @version 2.0
- * @since 14/01/2026
+ * @since 15/01/2026
  */
 public class ClientDAO extends SocieteDAO {
 
     private static final Logger LOGGER = LoggerService.getLogger(ClientDAO.class);
-    private static final String ENTITY_NAME = "Client";
+    private final ContratDAO contratDAO;
 
     /**
      * Constructeur qui récupère l'instance de DatabaseConnection.
+     * Initialise également le ContratDAO pour gérer les contrats associés.
      *
      * @throws DAOException si la connexion à la base de données échoue
      */
     public ClientDAO() throws DAOException {
-            super();
+        super();
+        this.contratDAO = new ContratDAO();
 
     }
 
     /**
-     * Récupère tous les clients de la base de données.
+     * Récupère tous les clients de la base de données avec leurs adresses et contrats.
+     * <p>
+     * Effectue une jointure entre les tables societe, client, adresse et contrat
+     * pour récupérer toutes les informations en une seule requête.
      *
      * @return une liste de tous les clients
      * @throws DAOException si une erreur survient lors de la requête
@@ -62,20 +72,31 @@ public class ClientDAO extends SocieteDAO {
                 "INNER JOIN adresse a ON s.adresse_id = a.id_adresse";
 
         try (Statement statement = dbConnexion.getConnection().createStatement();
-        ResultSet rs = statement.executeQuery(query)) {
+
+            ResultSet rs = statement.executeQuery(query)) {
             while (rs.next()) {
                 Client client = mapResultSetToClient(rs);
+
+                // Charger les contrats du client
+                try {
+                    List<Contrat> contrats = contratDAO.findByIdClient(client.getId());
+                    for (Contrat contrat : contrats) {
+                        client.ajouterContrat(contrat);
+                    }
+                } catch (DAOException e) {
+                    LOGGER.log(Level.WARNING,
+                            "Imposible de charger les contrats du client ID= {0}", client.getId());
+                }
                 clients.add(client);
             }
-            LOGGER.log(Level.INFO, "Récupération de {0} clients" + clients.size());
             return clients;
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Erreur lors de la récupération de tous les clients", e);
             throw new DAOException(
-                    DAOException.ErrorCode.READ_ERROR,
+                    SQLExceptionAnalyzer.categorize(e),
                     "findAll",
                     null,
-                    "Erreur lors de la récupération de tous les clients : " + e.getMessage(),
+                    "Erreur lors de la récupération de tous les clients : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
         } catch (ValidationException ex) {
@@ -84,7 +105,7 @@ public class ClientDAO extends SocieteDAO {
                     DAOException.ErrorCode.READ_ERROR,
                     "findAll",
                     null,
-                    "Erreur de validation des données : " + ex.getMessage(),
+                    "Erreur de validation des données du client : " + ex.getMessage(),
                     ex
             );
         }
@@ -123,19 +144,29 @@ public class ClientDAO extends SocieteDAO {
             try (ResultSet rs = statement.executeQuery()) {
                 if (rs.next()) {
                     Client client = mapResultSetToClient(rs);
+
+                    // Charger les contrats du client
+                    try {
+                        List<Contrat> contrats = contratDAO.findByIdClient(client.getId());
+                        for (Contrat contrat : contrats) {
+                            client.ajouterContrat(contrat);
+                        }
+                    } catch (DAOException e) {
+                        LOGGER.log(Level.WARNING,
+                                "Impossible de charger les contrats du client ID={0}", client.getId());
+                    }
                     return client;
                 } else {
-                    LOGGER.log(Level.INFO, "Aucun client trouvé avec l'ID {0}", id);
                     return null;
                 }
             }
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Erreur SQL lors de findById avec ID=" + id, e);
             throw new DAOException(
-                    DAOException.ErrorCode.READ_ERROR,
+                    SQLExceptionAnalyzer.categorize(e),
                     "findById",
                     id,
-                    "Erreur lors de la recherche du client : " + e.getMessage(),
+                    "Erreur lors de la recherche du client : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
         } catch (ValidationException ex) {
@@ -151,8 +182,16 @@ public class ClientDAO extends SocieteDAO {
     }
 
     /**
-     * Insère un nouveau client dans la base de données.
-     * L'ID est généré automatiquement et affecté à l'objet.
+     * Insère un nouveau client dans la base de données avec transaction.
+     * <p>
+     * Processus :
+     * 1. Démarre une transaction
+     * 2. Insère la partie société (table societe) via SocieteDAO
+     * 3. Insère la partie client (table client)
+     * 4. Commit de la transaction
+     * <p>
+     * Note : Les contrats ne sont pas insérés automatiquement, ils doivent
+     * être créés séparément via ContratDAO après la création du client.
      *
      * @param client le client à insérer
      * @return le client avec son ID généré
@@ -177,7 +216,10 @@ public class ClientDAO extends SocieteDAO {
             Integer societeId = createSociete(client);
 
             // 2. Insérer la partie client
-            String query = "INSERT INTO client (id_societe, chiffre_affaires, nb_employes) " +
+            String query = "INSERT INTO client (" +
+                    "id_societe, " +
+                    "chiffre_affaires, " +
+                    "nb_employes) " +
                     " VALUES (?, ?, ?)";
 
             try (PreparedStatement statement = connection.prepareStatement(query)) {
@@ -201,10 +243,10 @@ public class ClientDAO extends SocieteDAO {
                 LOGGER.log(Level.SEVERE, "Erreur lors de la création de client, rollback effectué", e);
 
             } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback",  rollbackEx);
+                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
             }
 //            String detailedMessage = analyzeSQLException(e);
-            LOGGER.log(Level.SEVERE, "Erreur lors de la création du client : " );
+            LOGGER.log(Level.SEVERE, "Erreur lors de la création du client : ");
             throw new DAOException(
                     SQLExceptionAnalyzer.categorize(e),
                     "create",
@@ -216,14 +258,22 @@ public class ClientDAO extends SocieteDAO {
             try {
                 connection.setAutoCommit(true);
 
-            }catch (SQLException e){
+            } catch (SQLException e) {
                 LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", e);
             }
         }
     }
 
     /**
-     * Met à jour un client existant dans la base de données.
+     * Met à jour un client existant dans la base de données avec transaction.
+     * <p>
+     * Met à jour :
+     * Les informations de la société (raison sociale, téléphone, email, etc.)
+     * Les informations spécifiques du client (chiffre d'affaires, nb employés)
+     * L'adresse associée
+     * <p>
+     * Note : Les contrats ne sont pas mis à jour par cette méthode.
+     * Utilisez ContratDAO.save() pour modifier les contrats.
      *
      * @param client le client à mettre à jour (doit avoir un ID valide)
      * @return true si la mise à jour a réussi, false sinon
@@ -246,7 +296,9 @@ public class ClientDAO extends SocieteDAO {
             saveSociete(client);
 
             // 2. Mettre à jour la partie client
-            String query = "UPDATE client SET chiffre_affaires = ?, nb_employes = ? " +
+            String query = "UPDATE client " +
+                    "SET chiffre_affaires = ?, " +
+                    "nb_employes = ? " +
                     "WHERE id_client = ?";
             try (PreparedStatement statement = connection.prepareStatement(query)) {
                 statement.setLong(1, client.getChiffreAffaires());
@@ -256,20 +308,18 @@ public class ClientDAO extends SocieteDAO {
                 int rowsAffected = statement.executeUpdate();
                 if (rowsAffected > 0) {
                     connection.commit();
-                    LOGGER.log(Level.INFO, "Client mis à jour avec l'ID {0}", client.getId());
                     return true;
                 } else {
                     connection.rollback();
-                    LOGGER.log(Level.WARNING, "Aucun client trouvé avec l'ID {0}", client.getId());
                     return false;
                 }
             }
         } catch (SQLException e) {
             try {
                 connection.rollback();
-                LOGGER.log(Level.SEVERE, "Erreur lors de la mis à jour, rollback effectué", e);
+                LOGGER.log(Level.WARNING, "Erreur lors de la mis à jour, rollback effectué", e);
             } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback",  rollbackEx);
+                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
             }
 
 //            String detailedMessage = analyzeSQLException(e);
@@ -284,7 +334,7 @@ public class ClientDAO extends SocieteDAO {
         } finally {
             try {
                 connection.setAutoCommit(true);
-            } catch (SQLException e){
+            } catch (SQLException e) {
                 LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", e);
             }
         }
@@ -292,10 +342,23 @@ public class ClientDAO extends SocieteDAO {
 
     /**
      * Supprime un client de la base de données avec transaction.
+     * <p>
+     * IMPORTANT : La suppression est interdite si le client possède des contrats.
+     * Une exception métier sera levée dans ce cas.
+     * <p>
+     * Processus de suppression :
+     * 1. Vérifie que le client n'a aucun contrat associé
+     * 2. Supprime l'enregistrement client (table client)
+     * 3. Supprime l'enregistrement société (table societe)
+     * 4. L'adresse est conservée (peut être référencée par d'autres entités)
+     * <p>
+     * Note : Si la suppression échoue à n'importe quelle étape,
+     * toute la transaction est annulée (rollback).
      *
      * @param id l'identifiant du client à supprimer
      * @return true si la suppression a réussi, false sinon
-     * @throws DAOException si une erreur survient ou si des contrats sont liés
+     * @throws DAOException si une erreur survient lors de la suppression
+     *                      ou si le client possède des contrats
      */
     public boolean delete(Integer id) throws DAOException {
         if (id == null || id <= 0) {
@@ -311,6 +374,7 @@ public class ClientDAO extends SocieteDAO {
         try {
             connection.setAutoCommit(false);
 
+            // 1. Véri
             // Vérifier s'il existe des contrats liés à ce client
             String query = "SELECT COUNT(*) FROM contrat WHERE client_id = ?";
 
@@ -323,7 +387,7 @@ public class ClientDAO extends SocieteDAO {
                         connection.rollback();
                         String errorMsg = String.format(
                                 "Impossible de supprimer le client ID %d : %d contrat(s) y sont liés. " +
-                                "Supprimez d'abord les contrats associés.", id, count);
+                                        "Supprimez d'abord les contrats associés.", id, count);
                         LOGGER.log(Level.SEVERE, errorMsg);
                         throw new DAOException(
                                 DAOException.ErrorCode.FOREIGN_KEY_VIOLATION,
@@ -386,7 +450,7 @@ public class ClientDAO extends SocieteDAO {
                 connection.rollback();
                 LOGGER.log(Level.SEVERE, "Erreur lord de la suppression du client ID " + id, e);
             } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback",  rollbackEx);
+                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
             }
 
 //            String detailedMessage = analyzeSQLException(e);
@@ -402,8 +466,8 @@ public class ClientDAO extends SocieteDAO {
         } finally {
             try {
                 connection.setAutoCommit(true);
-            } catch (SQLException e){
-                LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit",  e);
+            } catch (SQLException e) {
+                LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", e);
             }
         }
     }
@@ -413,7 +477,7 @@ public class ClientDAO extends SocieteDAO {
      *
      * @param rs le ResultSet contenant les données
      * @return l'objet Client créé
-     * @throws SQLException si une erreur survient lors de la lecture du ResultSet
+     * @throws SQLException        si une erreur survient lors de la lecture du ResultSet
      * @throws ValidationException si les données ne respectent pas les règles métier
      */
     private Client mapResultSetToClient(ResultSet rs) throws SQLException, ValidationException {
@@ -423,7 +487,7 @@ public class ClientDAO extends SocieteDAO {
                 rs.getString("nom_rue"),
                 rs.getString("code_postal"),
                 rs.getString("ville")
-                );
+        );
         adresse.setId(rs.getInt("id_societe"));
 
         // Créer le client
