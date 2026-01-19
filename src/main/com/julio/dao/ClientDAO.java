@@ -4,7 +4,8 @@ import main.com.julio.exception.DAOException;
 import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Adresse;
 import main.com.julio.model.Client;
-import main.com.julio.util.LoggerUtil;
+import main.com.julio.service.LoggerService;
+import main.com.julio.util.SQLExceptionAnalyzer;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -22,7 +23,7 @@ import java.util.logging.Logger;
  */
 public class ClientDAO extends SocieteDAO {
 
-    private static final Logger LOGGER = LoggerUtil.getLogger(ClientDAO.class);
+    private static final Logger LOGGER = LoggerService.getLogger(ClientDAO.class);
     private static final String ENTITY_NAME = "Client";
 
     /**
@@ -31,19 +32,8 @@ public class ClientDAO extends SocieteDAO {
      * @throws DAOException si la connexion à la base de données échoue
      */
     public ClientDAO() throws DAOException {
-//        try {
             super();
-//            LOGGER.fine("ClientDAO initialisé avec succès");
-//        } catch (SQLException e) {
-//            LOGGER.log(Level.SEVERE, "Échec de l'initialisation de ClientDAO", e);
-//            throw new DAOException(
-//                    DAOException.ErrorCode.CONNECTION_ERROR,
-//                    "init",
-//                    null,
-//                    "Imposible d'initialiser ClientDAO : " + e.getMessage(),
-//                    e
-//            );
-//        }
+
     }
 
     /**
@@ -54,10 +44,19 @@ public class ClientDAO extends SocieteDAO {
      */
     public List<Client> findAll() throws DAOException {
         List<Client> clients = new ArrayList<>();
-        String query = "SELECT s.id_societe, s.raison_sociale, s.adresse_id, s.telephone, " +
-                "s.email, s.commentaires, " +
-                "c.id_client, c.chiffre_affaires, c.nb_employes, " +
-                "a.numero_rue, a.nom_rue, a.code_postal, a.ville " +
+        String query = "SELECT s.id_societe, " +
+                "s.raison_sociale, " +
+                "s.adresse_id, " +
+                "s.telephone, " +
+                "s.email, " +
+                "s.commentaires, " +
+                "c.id_client, " +
+                "c.chiffre_affaires, " +
+                "c.nb_employes, " +
+                "a.numero_rue, " +
+                "a.nom_rue, " +
+                "a.code_postal, " +
+                "a.ville " +
                 "FROM Societe s " +
                 "INNER JOIN client c ON s.id_societe = c.id_societe " +
                 "INNER JOIN adresse a ON s.adresse_id = a.id_adresse";
@@ -204,13 +203,13 @@ public class ClientDAO extends SocieteDAO {
             } catch (SQLException rollbackEx) {
                 LOGGER.log(Level.SEVERE, "Erreur lors du rollback",  rollbackEx);
             }
-            String detailedMessage = analyzeSQLException(e);
-            LOGGER.log(Level.SEVERE, "Erreur lors de la création du client : " + detailedMessage);
+//            String detailedMessage = analyzeSQLException(e);
+            LOGGER.log(Level.SEVERE, "Erreur lors de la création du client : " );
             throw new DAOException(
-                    categorizeSQLException(e),
+                    SQLExceptionAnalyzer.categorize(e),
                     "create",
                     client.getId(),
-                    "Erreur lors de la création du client : " + detailedMessage,
+                    "Erreur : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
         } finally {
@@ -273,13 +272,13 @@ public class ClientDAO extends SocieteDAO {
                 LOGGER.log(Level.SEVERE, "Erreur lors du rollback",  rollbackEx);
             }
 
-            String detailedMessage = analyzeSQLException(e);
+//            String detailedMessage = analyzeSQLException(e);
             LOGGER.log(Level.SEVERE, "Erreur lors de la mise à jour du client ID= " + client.getId(), e);
             throw new DAOException(
-                    categorizeSQLException(e),
+                    SQLExceptionAnalyzer.categorize(e),
                     "save",
                     client.getId(),
-                    "Erreur lors de la mise à jour du client : " + detailedMessage,
+                    "Erreur lors de la mise à jour du client : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
         } finally {
@@ -390,14 +389,14 @@ public class ClientDAO extends SocieteDAO {
                 LOGGER.log(Level.SEVERE, "Erreur lors du rollback",  rollbackEx);
             }
 
-            String detailedMessage = analyzeSQLException(e);
+//            String detailedMessage = analyzeSQLException(e);
             LOGGER.log(Level.SEVERE, "Erreur lors de la suppression du client ID=" + id, e);
 
             throw new DAOException(
-                    categorizeSQLException(e),
+                    SQLExceptionAnalyzer.categorize(e),
                     "delete",
                     id,
-                    "Erreur lors de la suppression du client : " + detailedMessage,
+                    "Erreur lors de la suppression du client : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
         } finally {
@@ -407,56 +406,6 @@ public class ClientDAO extends SocieteDAO {
                 LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit",  e);
             }
         }
-    }
-
-    /**
-     * Analyse une SQLException pour fournir un message d'erreur détaillé.
-     */
-    private String analyzeSQLException(SQLException e) {
-        String sqlState = e.getSQLState();
-        int errorCode = e.getErrorCode();
-
-        if (sqlState != null) {
-            // Codes SQL standard
-            if (sqlState.startsWith("23")) {
-                if (sqlState.equals("23000")) {
-                    return "Violation de contrainte d'intégrité (vérifiez les clés étrangères)";
-                } else if (sqlState.equals("23505")) {
-                    return "Violation de contrainte d'unicité (valeur déjà existante)";
-                }
-                return "Violation de contrainte d'intégrité";
-            } else if (sqlState.startsWith("42")) {
-                return "Erreur de syntaxe SQL ou objet non trouvé";
-            } else if (sqlState.startsWith("08")) {
-                return "Problème de connexion à la base de données";
-            }
-        }
-
-        return e.getMessage();
-    }
-
-    /**
-     * Catégorise une SQLException en ErrorCode.
-     */
-    private DAOException.ErrorCode categorizeSQLException(SQLException e) {
-        String sqlState = e.getSQLState();
-
-        if (sqlState != null) {
-            if (sqlState.startsWith("23")) {
-                if (sqlState.contains("foreign")) {
-                    return DAOException.ErrorCode.FOREIGN_KEY_VIOLATION;
-                } else if (sqlState.contains("unique")) {
-                    return DAOException.ErrorCode.UNIQUE_CONSTRAINT_VIOLATION;
-                } else if (sqlState.contains("null")) {
-                    return DAOException.ErrorCode.NOT_NULL_VIOLATION;
-                }
-                return DAOException.ErrorCode.CHECK_CONSTRAINT_VIOLATION;
-            } else if (sqlState.startsWith("08")) {
-                return DAOException.ErrorCode.CONNECTION_ERROR;
-            }
-        }
-
-        return DAOException.ErrorCode.GENERAL_ERROR;
     }
 
     /**

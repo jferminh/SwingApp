@@ -3,7 +3,8 @@ package main.com.julio.dao;
 import main.com.julio.exception.DAOException;
 import main.com.julio.model.Adresse;
 import main.com.julio.model.Societe;
-import main.com.julio.util.LoggerUtil;
+import main.com.julio.service.LoggerService;
+import main.com.julio.util.SQLExceptionAnalyzer;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -12,19 +13,20 @@ import java.sql.SQLException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static main.com.julio.service.LoggingService.LOGGER;
-
 /**
  * Classe DAO pour la gestion de la table société.
  * Gère les informations communes aux clients et prospects.
  *
+ * Cette classe fournit des méthodes protégées pour les opérations CRUD
+ * sur la partie commune des entités Client et Prospect.
+ *
  * @author Julio FERMIN
  * @version 2.0
- * @since 14/01/2026
+ * @since 15/01/2026
  */
-public class SocieteDAO {
+public abstract class SocieteDAO {
 
-    private static final Logger LOGGER = LoggerUtil.getLogger(SocieteDAO.class);
+    private static final Logger LOGGER = LoggerService.getLogger(SocieteDAO.class);
     protected final DatabaseConnexion dbConnexion;
     protected final AdresseDAO adresseDAO;
 
@@ -53,22 +55,53 @@ public class SocieteDAO {
      * Insère une société (partie commune) dans la base de données.
      * Cette méthode est utilisée par ClientDAO et ProspectDAO.
      *
-     * @param societe     la société à insérer
+     * @param societe la société à insérer
      * @return l'ID généré pour la société
-     * @throws SQLException si une erreur survient lors de l'insertion
+     * @throws DAOException si une erreur survient lors de l'insertion
      */
-    protected Integer createSociete(Societe societe) throws SQLException {
+    protected Integer createSociete(Societe societe) throws DAOException {
         if (societe == null) {
-            throw new IllegalArgumentException("La société ne peut pas être null");
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "createSociete",
+                    null,
+                    "La société ne peut pas être null"
+            );
         }
 
-        // Créer ou récupérer l'adresse
+        // 1. Créer ou récupérer l'adresse
         Adresse adresse = societe.getAdresse();
-        if (adresse.getId() == null) {
-            adresse = adresseDAO.create(adresse);
+        if (adresse == null) {
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "createSociete",
+                    null,
+                    "L'adresse de la société ne peut pas être null"
+            );
         }
 
-        String query = "INSERT INTO societe(raison_sociale, adresse_id, telephone, email, commentaires) " +
+        if (adresse.getId() == null) {
+            try {
+                adresse = adresseDAO.create(adresse);
+
+            } catch (DAOException ex) {
+                LOGGER.log(Level.SEVERE, "Erreur lors de la création de l'adresse", ex);
+                throw new DAOException(
+                        DAOException.ErrorCode.CREATE_ERROR,
+                        "createSociete",
+                        null,
+                        "Erreur lors de la création de l'adresse : " + ex.getMessage(),
+                        ex
+                );
+            }
+        }
+
+        // 2. Insérer la société
+        String query = "INSERT INTO societe(raison_sociale" +
+                ", adresse_id, " +
+                "telephone, " +
+                "email, " +
+                "commentaires) " +
                 "VALUES (?, ?, ?, ?, ?)";
 
         try (PreparedStatement preparedStatement = dbConnexion.getConnection()
@@ -81,7 +114,7 @@ public class SocieteDAO {
 
             int rowsAffected = preparedStatement.executeUpdate();
             if (rowsAffected == 0) {
-                throw new SQLException("L'insertion de la société a échoué");
+                throw new SQLException("L'insertion de la société a échoué, aucune ligne affectée");
             }
 
             // Récupérer l'ID généré
@@ -89,7 +122,7 @@ public class SocieteDAO {
                 if (generatedKeys.next()) {
                     Integer societeId = generatedKeys.getInt(1);
                     societe.setId(societeId);
-                    LOGGER.log(Level.INFO, "Société créée avec l'ID {0}", societeId);
+//                    LOGGER.log(Level.INFO, "Société créée avec l'ID {0}", societeId);
                     return societeId;
                 } else {
                     throw new SQLException("L'insertion a échoué, aucun ID généré");
@@ -97,7 +130,13 @@ public class SocieteDAO {
             }
         } catch (SQLException sqlEx) {
             LOGGER.log(Level.SEVERE, "Erreur lors de la création de la société", sqlEx);
-            throw sqlEx;
+            throw new DAOException(
+                    SQLExceptionAnalyzer.categorize(sqlEx),
+                    "createSociete",
+                    null,
+                    "Erreur lors de la création de la société : " + SQLExceptionAnalyzer.analyze(sqlEx),
+                    sqlEx
+            );
         }
     }
 
@@ -106,22 +145,43 @@ public class SocieteDAO {
      *
      * @param societe la société à mettre à jour
      * @return true si la mise à jour a réussi
-     * @throws SQLException si une erreur survient
+     * @throws DAOException si une erreur survient
      */
-    protected boolean saveSociete(Societe societe) throws SQLException {
+    protected boolean saveSociete(Societe societe) throws DAOException {
         if (societe == null || societe.getId() == null || societe.getId() <= 0) {
-            throw new IllegalArgumentException("La société doit avoir un ID valide");
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "saveSociete",
+                    societe != null ? societe.getId() : null,
+                    "La société doit avoir un ID valide"
+            );
         }
 
         // Mettre à jour l'adresse si elle a un ID
         Adresse adresse = societe.getAdresse();
-        if (adresse.getId() != null) {
-            adresseDAO.save(adresse);
+        if (adresse != null && adresse.getId() != null) {
+            try {
+                adresseDAO.save(adresse);
+            } catch (DAOException ex) {
+                LOGGER.log(Level.SEVERE, "Erreur lors de la mise à jour de l'adresse", ex);
+                throw new DAOException(
+                        DAOException.ErrorCode.UPDATE_ERROR,
+                        "saveSociete",
+                        societe.getId(),
+                        "Erreur lors de la mise à jour de l'adresse : " + ex.getMessage(),
+                        ex
+                );
+            }
         }
 
+        // Metre à jour la société
         String query = "UPDATE societe " +
-                "SET raison_sociale = ?, adresse_id = ?, telephone = ?, email = ?, commentaires = ? " +
-                "WHERE id = ?";
+                "SET raison_sociale = ?, " +
+                "adresse_id = ?, " +
+                "telephone = ?, " +
+                "email = ?, " +
+                "commentaires = ? " +
+                "WHERE id_societe = ?";
 
         try (PreparedStatement preparedStatement = dbConnexion.getConnection()
                 .prepareStatement(query)) {
@@ -134,29 +194,41 @@ public class SocieteDAO {
 
             int rowsAffected = preparedStatement.executeUpdate();
             if (rowsAffected > 0) {
-                LOGGER.log(Level.INFO, "Société mise à jour avec l'ID {0}", societe.getId());
+//                LOGGER.log(Level.INFO, "Société mise à jour avec l'ID {0}", societe.getId());
                 return true;
             } else {
-                LOGGER.log(Level.WARNING, "Aucune société trouvée avec l'ID {0}", societe.getId());
+//                LOGGER.log(Level.WARNING, "Aucune société trouvée avec l'ID {0}", societe.getId());
                 return false;
             }
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Erreur lors de la mise à jour de la société", e);
-            throw e;
+            throw new DAOException(
+                    SQLExceptionAnalyzer.categorize(e),
+                    "saveSociete",
+                    societe.getId(),
+                    "Erreur lors de la mise à jour : " + SQLExceptionAnalyzer.analyze(e),
+                    e
+            );
         }
     }
 
-    protected boolean deleteSociete(Integer id) throws SQLException {
+    protected boolean deleteSociete(Integer id) throws DAOException {
         if (id == null || id <= 0) {
-            throw new IllegalArgumentException("L'ID doit être valide");
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "deleteSociete",
+                    id,
+                    "L'ID doit être valide"
+            );
         }
 
         Connection connection = dbConnexion.getConnection();
 
-        String query = "DELETE FROM societe WHERE id = ?";
         try {
             connection.setAutoCommit(false);
 
+            String query = "DELETE FROM societe " +
+                    "WHERE id_societe = ?";
             try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
                 preparedStatement.setInt(1, id);
 
@@ -164,11 +236,11 @@ public class SocieteDAO {
 
                 if (rowsAffected > 0) {
                     connection.commit();
-                    LOGGER.log(Level.INFO, "Société supprimée avec l'ID {0}", id);
+//                    LOGGER.log(Level.INFO, "Société supprimée avec l'ID {0}", id);
                     return true;
                 } else {
                     connection.rollback();
-                    LOGGER.log(Level.WARNING, "Aucune société trouve avec l'ID {0}", id);
+//                    LOGGER.log(Level.WARNING, "Aucune société trouve avec l'ID {0}", id);
                     return false;
                 }
             }
@@ -179,7 +251,13 @@ public class SocieteDAO {
             } catch (SQLException rollbackEx) {
                 LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
             }
-            throw sqlEx;
+            throw new DAOException(
+                    SQLExceptionAnalyzer.categorize(sqlEx),
+                    "deleteSociete",
+                    id,
+                    "Erreur lors de la suppression : " + SQLExceptionAnalyzer.analyze(sqlEx),
+                    sqlEx
+            );
         } finally {
             try {
                 connection.setAutoCommit(true);
@@ -188,4 +266,6 @@ public class SocieteDAO {
             }
         }
     }
+
+
 }
