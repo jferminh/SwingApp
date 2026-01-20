@@ -1,17 +1,22 @@
 package main.com.julio.viewmodel;
 
+import main.com.julio.dao.AdresseDAO;
+import main.com.julio.dao.ProspectDAO;
+import main.com.julio.exception.DAOException;
 import main.com.julio.exception.NotFoundException;
 import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Adresse;
 import main.com.julio.model.Interesse;
 import main.com.julio.model.Prospect;
 import main.com.julio.repository.ProspectRepository;
+import main.com.julio.service.LoggerService;
 import main.com.julio.service.UnicityService;
 
 import javax.swing.table.DefaultTableModel;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static main.com.julio.service.LoggingService.LOGGER;
 
@@ -28,22 +33,14 @@ import static main.com.julio.service.LoggingService.LOGGER;
  * @since 19/11/2025
  */
 public class ProspectViewModel {
+    private static final Logger LOGGER = LoggerService.getLogger(ProspectViewModel.class);
+    private final ProspectDAO prospectDAO;
+    private final AdresseDAO adresseDAO;
 
-    // Repository - Accès données
-    private final ProspectRepository prospectRepo;
-
-    // Services métier
-    private final UnicityService unicityService;
-
-    /**
-     * Constructeur initialisant le ViewModel avec ses dépendances.
-     *
-     * @param prospectRepo repository des prospects
-     * @param unicityService service de vérification d'unicité
-     */
-    public ProspectViewModel(ProspectRepository prospectRepo, UnicityService unicityService) {
-        this.prospectRepo = prospectRepo;
-        this.unicityService = unicityService;
+    public ProspectViewModel() throws DAOException {
+        this.prospectDAO = new ProspectDAO();
+        this.adresseDAO = new AdresseDAO();
+        LOGGER.info("ProspectViewModel initialisé avec succès");
     }
 
     /**
@@ -61,7 +58,7 @@ public class ProspectViewModel {
      * @param interesse niveau d'intérêt (OUI/NON)
      * @throws ValidationException si validation échoue ou raison sociale existe
      */
-    public void creerProspect(String raisonSociale,
+    public Prospect creerProspect(String raisonSociale,
                               String numeroRue,
                               String nomRue,
                               String codePostal,
@@ -73,13 +70,11 @@ public class ProspectViewModel {
                               Interesse interesse
     ) throws ValidationException {
         try {
-            // Vérification unicité raison sociale (-1 = nouvelle entité)
-            if (unicityService.isRaisonSocialDuplique(raisonSociale, -1)) {
-                throw new ValidationException("Cette raison sociale existe déjà");
-            }
-
-            // Construction objets avec validation intégrée
+            // 1. Créer l'adresse
             Adresse adresse = new Adresse(numeroRue, nomRue, codePostal, ville);
+            adresse = adresseDAO.create(adresse);
+
+            // 2. Créer le prospect
             Prospect prospect = new Prospect(
                     raisonSociale,
                     adresse,
@@ -90,11 +85,18 @@ public class ProspectViewModel {
                     interesse
             );
 
-            prospectRepo.add(prospect);
+            prospect = prospectDAO.create(prospect);
 
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, e.getMessage(), e);
-            throw e;  // Propagation pour affichage dans la vue
+            LOGGER.log(Level.INFO, "Prospect créé avec succès : ID={0}", prospect.getId());
+
+            return prospect;
+
+        } catch (ValidationException e) {
+            LOGGER.log(Level.WARNING, "Erreur de validation", e);
+            throw new IllegalArgumentException("Données invalides : " + e.getMessage(), e);
+        } catch (DAOException e) {
+            LOGGER.log(Level.SEVERE, "Erreur DAO", e);
+            throw new RuntimeException("Erreur lors de la création : " + e.getMessage(), e);
         }
     }
 
@@ -115,7 +117,7 @@ public class ProspectViewModel {
      * @throws ValidationException si validation échoue ou raison sociale dupliquée
      * @throws NotFoundException si prospect inexistant
      */
-    public void modifierProspect(int id,
+    public boolean modifierProspect(Integer id,
                                  String raisonSociale,
                                  String numeroRue,
                                  String nomRue,
@@ -127,23 +129,13 @@ public class ProspectViewModel {
                                  LocalDate dateProspection,
                                  Interesse interesse) throws ValidationException, NotFoundException {
         try {
-            // Vérification unicité (exclure l'entité en cours de modification)
-            if (unicityService.isRaisonSocialDuplique(raisonSociale, id)) {
-                throw new ValidationException("Cette raison sociale existe déjà");
-            }
+            Prospect prospect = prospectDAO.findById(id);
 
-            Prospect prospect = prospectRepo.findById(id);
             if (prospect == null) {
-                throw new NotFoundException("Prospect introuvable");
+                throw new IllegalArgumentException("Prospect introuvable avec l'ID " + id);
             }
 
-            // Modification adresse (objet imbriqué)
-            prospect.getAdresse().setNumeroRue(numeroRue);
-            prospect.getAdresse().setNomRue(nomRue);
-            prospect.getAdresse().setCodePostal(codePostal);
-            prospect.getAdresse().setVille(ville);
-
-            // Modification attributs prospect
+            // Mise à jour
             prospect.setRaisonSociale(raisonSociale);
             prospect.setTelephone(telephone);
             prospect.setEmail(email);
@@ -151,10 +143,20 @@ public class ProspectViewModel {
             prospect.setDateProspection(dateProspection);
             prospect.setInteresse(interesse);
 
-            prospectRepo.update(prospect);
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, e.getMessage(), e);
-            throw e;
+            // Mise à jour adresse
+            Adresse adresse = prospect.getAdresse();
+            adresse.setNumeroRue(numeroRue);
+            adresse.setNomRue(nomRue);
+            adresse.setCodePostal(codePostal);
+            adresse.setVille(ville);
+
+            adresseDAO.save(adresse);
+
+            return prospectDAO.save(prospect);
+        } catch (ValidationException e) {
+            throw new IllegalArgumentException("Données invalides : " + e.getMessage(), e);
+        } catch (DAOException e) {
+            throw new RuntimeException("Erreur lors de la modification : " + e.getMessage(), e);
         }
     }
 
@@ -164,12 +166,11 @@ public class ProspectViewModel {
      * @param id identifiant du prospect à supprimer
      * @return true si suppression réussie, false sinon
      */
-    public boolean supprimerProspect(int id) {
+    public boolean supprimerProspect(Integer id) {
         try {
-            return prospectRepo.delete(id);
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, e.getMessage(), e);
-            return false;
+            return prospectDAO.delete(id);
+        } catch (DAOException e) {
+            throw new RuntimeException("Erreur lors de la suppression : " + e.getMessage(), e);
         }
     }
 
@@ -179,8 +180,12 @@ public class ProspectViewModel {
      * @param id identifiant du prospect
      * @return le prospect trouvé ou null si inexistant
      */
-    public Prospect getProspectById(int id) {
-        return prospectRepo.findById(id);
+    public Prospect getProspectById(Integer id) {
+        try {
+            return prospectDAO.findById(id);
+        } catch (DAOException e) {
+            throw new RuntimeException("Erreur lors de la récupération : " + e.getMessage(), e);
+        }
     }
 
     /**
@@ -189,7 +194,11 @@ public class ProspectViewModel {
      * @return liste de tous les prospects
      */
     public List<Prospect> getTousLesProspects() {
-        return prospectRepo.findAll();
+        try {
+            return prospectDAO.findAll();
+        } catch (DAOException e) {
+            throw new RuntimeException("Erreur lors de la récupération : " + e.getMessage(), e);
+        }
     }
 
     /**
@@ -229,5 +238,10 @@ public class ProspectViewModel {
         }
 
         return model;
+    }
+
+    public Prospect[] getProspectsForComboBox() {
+        List<Prospect> prospects = getTousLesProspects();
+        return prospects.toArray(new Prospect[0]);
     }
 }
