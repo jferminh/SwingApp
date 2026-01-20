@@ -68,7 +68,7 @@ public class ProspectViewModel {
                               String commentaires,
                               LocalDate dateProspection,
                               Interesse interesse
-    ) throws ValidationException {
+    ) {
         try {
             // 1. Créer l'adresse
             Adresse adresse = new Adresse(numeroRue, nomRue, codePostal, ville);
@@ -127,7 +127,7 @@ public class ProspectViewModel {
                                  String email,
                                  String commentaires,
                                  LocalDate dateProspection,
-                                 Interesse interesse) throws ValidationException, NotFoundException {
+                                 Interesse interesse) throws NotFoundException {
         try {
             Prospect prospect = prospectDAO.findById(id);
 

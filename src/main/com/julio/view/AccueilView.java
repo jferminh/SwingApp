@@ -2,6 +2,7 @@ package main.com.julio.view;
 
 import main.com.julio.model.Client;
 import main.com.julio.model.Prospect;
+import main.com.julio.service.LoggerService;
 import main.com.julio.util.DisplayDialog;
 import main.com.julio.viewmodel.ClientViewModel;
 import main.com.julio.viewmodel.ContratViewModel;
@@ -11,23 +12,24 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.List;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static main.com.julio.service.LoggingService.LOGGER;
 
 /**
- * Vue principale (écran d'accueil) de l'application de gestion clients-prospects.
- * Permet de sélectionner le type d'entité (Client/Prospect) et d'effectuer les opérations CRUD.
+ * Vue d'accueil de l'application.
+ * Permet de choisir entre la gestion des Clients et des Prospects.
  *
  * @author Julio FERMIN
- * @version 1.0
- * @since 19/11/2025
+ * @version 2.0
+ * @since 20/01/2026
  */
 public class AccueilView extends JFrame {
-
+    private static final Logger LOGGER = LoggerService.getLogger(AccueilView.class);
     // ViewModels - Pattern MVVM pour séparer logique métier et présentation
-    private ClientViewModel clientVM;
-    private ProspectViewModel prospectVM;
-    private ContratViewModel contratVM;
+    private final ClientViewModel clientVM;
+    private final ProspectViewModel prospectVM;
+    private final ContratViewModel contratVM;
 
     // Composants UI principaux
     private JLabel titre;
@@ -48,7 +50,10 @@ public class AccueilView extends JFrame {
      * @param prospectVM ViewModel des prospects
      * @param contratVM ViewModel des contrats
      */
-    public AccueilView(ClientViewModel clientVM, ProspectViewModel prospectVM, ContratViewModel contratVM) {
+    public AccueilView(
+            ClientViewModel clientVM,
+            ProspectViewModel prospectVM,
+            ContratViewModel contratVM) {
         this.clientVM = clientVM;
         this.prospectVM = prospectVM;
         this.contratVM = contratVM;

@@ -65,7 +65,6 @@ public class ProspectDAO extends SocieteDAO {
                 "FROM prospect p " +
                 "INNER JOIN societe s ON p.id_societe = s.id_societe " +
                 "INNER JOIN adresse a ON s.adresse_id = a.id_adresse " +
-                "WHERE s.type_societe = 'PROSPECT' " +
                 "ORDER BY s.raison_sociale";
 
         try (Statement stmt = dbConnexion.getConnection().createStatement();
@@ -554,6 +553,7 @@ public class ProspectDAO extends SocieteDAO {
 
         String interesseStr = rs.getString("interesse");
         Interesse interesse = Interesse.valueOf(interesseStr);
+//        Interesse interesse = Interesse.valueOf(interesseStr);
 
         Prospect prospect = new Prospect(
                 rs.getString("raison_sociale"),

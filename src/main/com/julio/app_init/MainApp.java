@@ -54,14 +54,14 @@ public class MainApp {
         UnicityService unicityService = new UnicityService(clientRepo, prospectRepo);
 
         // ViewModels (injection par constructeur)
-        ClientViewModel clientVM = new ClientViewModel(clientRepo, contratRepo, unicityService);
-        ProspectViewModel prospectVM = new ProspectViewModel(prospectRepo, unicityService);
-        ContratViewModel contratVM = new ContratViewModel(contratRepo, clientRepo);
+//        ClientViewModel clientVM = new ClientViewModel(clientRepo, contratRepo, unicityService);
+//        ProspectViewModel prospectVM = new ProspectViewModel(prospectRepo, unicityService);
+//        ContratViewModel contratVM = new ContratViewModel(contratRepo, clientRepo);
 
         // Lancer l'UI sur l'Event Dispatch Thread (bonne pratique Swing)
-        SwingUtilities.invokeLater(() -> {
-            AccueilView accueil = new AccueilView(clientVM, prospectVM, contratVM);
-            accueil.setVisible(true);
-        });
+//        SwingUtilities.invokeLater(() -> {
+//            AccueilView accueil = new AccueilView(clientVM, prospectVM, contratVM);
+//            accueil.setVisible(true);
+//        });
     }
 }

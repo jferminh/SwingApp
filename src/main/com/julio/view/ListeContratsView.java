@@ -1,5 +1,6 @@
 package main.com.julio.view;
 
+import main.com.julio.exception.DAOException;
 import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Client;
 import main.com.julio.util.DisplayDialog;
@@ -167,14 +168,30 @@ public class ListeContratsView extends JFrame {
                         "Succès", JOptionPane.INFORMATION_MESSAGE);
                 chargerDonnees();  // Rafraîchir table
 
-            } catch (ValidationException ve) {
-                DisplayDialog.messageError("Erreur d'entrée", ve.getMessage());
-            } catch (NumberFormatException nfe) {
-                DisplayDialog.messageError("Erreur d'entrée",
-                        "Erreur de format numérique. Vérifiez vos saisies.");
-            } catch (Exception e) {
-                DisplayDialog.messageError("Erreur", e.getMessage());
-                LOGGER.log(Level.SEVERE, e.getMessage(), e);
+            } catch (NumberFormatException e) {
+                // Erreur de format du montant
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Le montant doit être un nombre valide.\nExemple : 1500.50",
+                        "Format invalide",
+                        JOptionPane.WARNING_MESSAGE
+                );
+            } catch (IllegalArgumentException e) {
+                // Erreur de validation (montant négatif, nom vide, etc.)
+                JOptionPane.showMessageDialog(
+                        this,
+                        e.getMessage(),
+                        "Données invalides",
+                        JOptionPane.WARNING_MESSAGE
+                );
+            } catch (RuntimeException e) {
+                // Erreur DAO (connexion, FK, etc.)
+                JOptionPane.showMessageDialog(
+                        this,
+                        e.getMessage(),
+                        "Erreur",
+                        JOptionPane.ERROR_MESSAGE
+                );
             }
         }
     }
@@ -221,14 +238,30 @@ public class ListeContratsView extends JFrame {
                 DisplayDialog.messageInfo("Succès", "Contrat modifié avec succès!");
                 chargerDonnees();
 
-            } catch (ValidationException ve) {
-                DisplayDialog.messageError("Erreur d'entrée", ve.getMessage());
-            } catch (NumberFormatException nfe) {
-                DisplayDialog.messageError("Erreur d'entrée",
-                        "Veuillez saisir des chiffres.");
-            } catch (Exception e) {
-                DisplayDialog.messageError("Erreur", e.getMessage());
-                LOGGER.log(Level.SEVERE, e.getMessage(), e);
+            } catch (NumberFormatException e) {
+                // Erreur de format du montant
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Le montant doit être un nombre valide.\nExemple : 1500.50",
+                        "Format invalide",
+                        JOptionPane.WARNING_MESSAGE
+                );
+            } catch (IllegalArgumentException e) {
+                // Erreur de validation (montant négatif, nom vide, etc.)
+                JOptionPane.showMessageDialog(
+                        this,
+                        e.getMessage(),
+                        "Données invalides",
+                        JOptionPane.WARNING_MESSAGE
+                );
+            } catch (RuntimeException e) {
+                // Erreur DAO (connexion, FK, etc.)
+                JOptionPane.showMessageDialog(
+                        this,
+                        e.getMessage(),
+                        "Erreur",
+                        JOptionPane.ERROR_MESSAGE
+                );
             }
         }
     }
@@ -239,7 +272,9 @@ public class ListeContratsView extends JFrame {
     private void supprimerContrat() {
         int selectedRow = table.getSelectedRow();
         if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(this, "Veuillez sélectionner un contrat",
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Veuillez sélectionner un contrat",
                     "Aucune sélection", JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -248,18 +283,33 @@ public class ListeContratsView extends JFrame {
         String nom = (String) table.getValueAt(selectedRow, 1);
 
         // Dialogue de confirmation
-        int confirm = JOptionPane.showConfirmDialog(this,
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
                 "Êtes-vous sûr de vouloir supprimer le contrat : " + nom + " ?",
                 "Confirmation", JOptionPane.YES_NO_OPTION);
 
         if (confirm == JOptionPane.YES_OPTION) {
-            boolean success = contratVM.supprimerContrat(contratId);
+            try {
+                boolean success = contratVM.supprimerContrat(contratId);
 
-            if (success) {
-                DisplayDialog.messageInfo("Succès", "Contrat supprimé avec succès!");
-                chargerDonnees();
-            } else {
-                DisplayDialog.messageError("Erreur", "Erreur lors de la suppression!");
+                if (success) {
+                    DisplayDialog.messageInfo(
+                            "Succès",
+                            "Contrat supprimé avec succès!");
+                    chargerDonnees();
+                } else {
+                    DisplayDialog.messageError(
+                            "Erreur",
+                            "Erreur lors de la suppression!");
+                }
+
+            } catch (RuntimeException e) {
+                JOptionPane.showMessageDialog(
+                        this,
+                        e.getMessage(),
+                        "Erreur",
+                        JOptionPane.ERROR_MESSAGE
+                );
             }
         }
     }

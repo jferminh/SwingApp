@@ -187,7 +187,7 @@ public class ContratDAO {
                 "montant " +
                 "FROM contrat " +
                 "WHERE client_id = ? " +
-                "ORDER BY id";
+                "ORDER BY id_contrat";
 
         try (PreparedStatement pstmt = dbConnection.getConnection().prepareStatement(sql)) {
 
@@ -514,7 +514,7 @@ public class ContratDAO {
                 rs.getString("nom_contrat"),
                 rs.getDouble("montant")
         );
-        contrat.setId(rs.getInt("id"));
+        contrat.setId(rs.getInt("id_contrat"));
         return contrat;
     }
 }

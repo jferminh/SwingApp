@@ -1,5 +1,6 @@
 package main.com.julio.view;
 
+import main.com.julio.exception.DAOException;
 import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Client;
 import main.com.julio.model.Interesse;
@@ -69,6 +70,7 @@ public class FormulaireView extends JFrame {
      * @param action action à effectuer ("Créer", "Modifier", "Supprimer")
      * @param origin vue d'origine ("accueil", "listeview")
      */
+
     public FormulaireView(ClientViewModel clientVM, ProspectViewModel prospectVM, ContratViewModel contratVM,
                           boolean isClient, Integer entityId, String action, String origin) {
         this.clientVM = clientVM;
@@ -87,6 +89,10 @@ public class FormulaireView extends JFrame {
         }
     }
 
+//    public FormulaireView() throws DAOException {
+//        this.clientVM = new ClientViewModel();
+//        initialiserInterface();
+//    }
     /**
      * Initialise l'interface adaptée selon le type d'entité et l'action.
      * Construit dynamiquement les champs spécifiques.
