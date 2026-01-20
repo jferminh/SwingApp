@@ -210,6 +210,77 @@ public abstract class SocieteDAO {
         }
     }
 
+    /**
+     * Supprime une société par son ID dans le contexte d'une transaction existante.
+     * <p>
+     * Cette méthode ne gère PAS les transactions (pas de setAutoCommit, commit ou rollback).
+     * Elle doit être appelée UNIQUEMENT dans le cadre d'une transaction déjà démarrée
+     * par la classe appelante (ClientDAO ou ProspectDAO).
+     * <p>
+     * Utilisée par ClientDAO.delete() et ProspectDAO.delete() pour supprimer
+     * la partie société après suppression de la partie spécifique (client/prospect).
+     *
+     * @param societeId l'ID de la société à supprimer
+     * @throws DAOException si une erreur survient lors de la suppression
+     *                      ou si l'ID est invalide ou si aucune société n'est trouvée
+     */
+    protected void deleteSocieteInTransaction(Integer societeId) throws DAOException {
+        if (societeId == null || societeId <= 0) {
+            LOGGER.log(Level.WARNING, "Tentative de suppression avec ID société invalide : {0}", societeId);
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "deleteSocieteInTransaction",
+                    societeId,
+                    "L'ID société doit être un entier positif non null"
+            );
+        }
+
+        String deleteSocieteSQL = "DELETE FROM societe WHERE id_societe = ?";
+
+        try (PreparedStatement pstmt = dbConnexion.getConnection().prepareStatement(deleteSocieteSQL)) {
+            pstmt.setInt(1, societeId);
+            int rowsAffected = pstmt.executeUpdate();
+
+            if (rowsAffected > 0) {
+                LOGGER.log(Level.FINE, "Société supprimée : ID={0}", societeId);
+            } else {
+                LOGGER.log(Level.WARNING, "Aucune société trouvée avec l'ID {0}", societeId);
+                throw new DAOException(
+                        DAOException.ErrorCode.ENTITY_NOT_FOUND,
+                        "deleteSocieteInTransaction",
+                        societeId,
+                        "Aucune société trouvée avec l'ID " + societeId
+                );
+            }
+
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Erreur SQL lors de la suppression de la société ID=" + societeId, e);
+
+            // Analyse spécifique pour les violations de contraintes
+            if (SQLExceptionAnalyzer.isForeignKeyViolation(e)) {
+                String constraintName = SQLExceptionAnalyzer.extractConstraintName(e);
+                throw new DAOException(
+                        DAOException.ErrorCode.FOREIGN_KEY_VIOLATION,
+                        "deleteSocieteInTransaction",
+                        societeId,
+                        "Impossible de supprimer la société : elle est référencée par d'autres entités" +
+                                (constraintName != null ? " (contrainte: " + constraintName + ")" : ""),
+                        e
+                );
+            }
+
+            // Analyse générale des autres erreurs SQL
+            throw new DAOException(
+                    SQLExceptionAnalyzer.categorize(e),
+                    "deleteSocieteInTransaction",
+                    societeId,
+                    "Erreur lors de la suppression de la société : " + SQLExceptionAnalyzer.analyze(e),
+                    e
+            );
+        }
+    }
+
+
     protected boolean deleteSociete(Integer id) throws DAOException {
         if (id == null || id <= 0) {
             throw new DAOException(

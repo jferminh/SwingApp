@@ -379,6 +379,65 @@ public class AdresseDAO {
     }
 
     /**
+     * Supprime une adresse par son ID dans le contexte d'une transaction existante.
+     * <p>
+     * Cette méthode ne gère PAS les transactions.
+     * Elle doit être appelée UNIQUEMENT si l'adresse n'est plus référencée.
+     *
+     * @param adresseId l'ID de l'adresse à supprimer
+     * @throws DAOException si une erreur survient lors de la suppression
+     */
+    public void deleteAdresseInTransaction(Integer adresseId) throws DAOException {
+        if (adresseId == null || adresseId <= 0) {
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "deleteAdresseInTransaction",
+                    adresseId,
+                    "L'ID adresse doit être un entier positif non null"
+            );
+        }
+
+        String deleteAdresseSQL = "DELETE FROM adresse WHERE id_adresse = ?";
+
+        try (PreparedStatement pstmt = dbConnexion.getConnection().prepareStatement(deleteAdresseSQL)) {
+            pstmt.setInt(1, adresseId);
+            int rowsAffected = pstmt.executeUpdate();
+
+            if (rowsAffected > 0) {
+                LOGGER.log(Level.INFO, "Adresse supprimée car non référencée : ID={0}", adresseId);
+            } else {
+                LOGGER.log(Level.WARNING, "Aucune adresse trouvée avec l'ID {0}", adresseId);
+                // Pas d'exception ici car ce n'est pas critique (adresse déjà supprimée)
+            }
+
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Erreur SQL lors de la suppression de l'adresse ID=" + adresseId, e);
+
+            // Analyse spécifique pour les violations de contraintes
+            if (SQLExceptionAnalyzer.isForeignKeyViolation(e)) {
+                String constraintName = SQLExceptionAnalyzer.extractConstraintName(e);
+                throw new DAOException(
+                        DAOException.ErrorCode.FOREIGN_KEY_VIOLATION,
+                        "deleteAdresseInTransaction",
+                        adresseId,
+                        "Impossible de supprimer l'adresse : elle est encore référencée par des sociétés" +
+                                (constraintName != null ? " (contrainte: " + constraintName + ")" : ""),
+                        e
+                );
+            }
+
+            throw new DAOException(
+                    SQLExceptionAnalyzer.categorize(e),
+                    "deleteAdresseInTransaction",
+                    adresseId,
+                    "Erreur lors de la suppression de l'adresse : " + SQLExceptionAnalyzer.analyze(e),
+                    e
+            );
+        }
+    }
+
+
+    /**
      * Méthode utilitaire pour mapper un ResultSet vers un objet Adresse.
      *
      * @param rs le ResultSet contenant les données

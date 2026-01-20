@@ -105,6 +105,7 @@ public class DAOException extends Exception {
         // Erreurs métier
         ENTITY_NOT_FOUND("Entité introuvable"),
         INVALID_PARAMETER("Paramètre invalide"),
+//        NOT_FOUND("Aucune enregistrement trouvée"),
 
         // Erreurs générales
         TRANSACTION_ERROR("Erreur de transaction"),

@@ -462,10 +462,11 @@ public class ClientDAO extends SocieteDAO {
             }
 
             // 4. Supprimer l'enregistrement société
-            String deleteSocieteSql = "DELETE FROM societe WHERE id_societe = ?";
-            try (PreparedStatement statement = connection.prepareStatement(deleteSocieteSql)) {
-                statement.setInt(1, societeId);
-                statement.executeUpdate();
+//            String deleteSocieteSql = "DELETE FROM societe WHERE id_societe = ?";
+            try {
+                deleteSocieteInTransaction(societeId);
+            } catch (DAOException e) {
+                throw e;
             }
 
             // 5. VÉRIFIER SI L'ADRESSE EST RÉFÉRENCÉE PAR D'AUTRES SOCIÉTÉS
@@ -488,14 +489,15 @@ public class ClientDAO extends SocieteDAO {
 
             // 6. Supprimer l'adresse si elle n'est plus référencée
             if (adresseId != null && !adresseEstReferenciee) {
-                String deleteAdresseSql = "DELETE FROM adresse WHERE id_adresse = ?";
-                try (PreparedStatement statement = connection.prepareStatement(deleteAdresseSql)) {
-                    statement.setInt(1, adresseId);
-                    int rowsAffected = statement.executeUpdate();
-                    if (rowsAffected > 0) {
-                        LOGGER.log(Level.INFO,
-                                "Adresse supprimée car non référencée : ID={0}", adresseId);
-                    }
+                try {
+                    adresseDAO.deleteAdresseInTransaction(adresseId);
+                } catch (DAOException e) {
+                    // Si l'adresse ne peut pas être supprimée (FK), on continue quand même
+                    // car la suppression du client a réussi
+                    LOGGER.log(Level.WARNING,
+                            "Impossible de supprimer l'adresse ID={0} : {1}",
+                            new Object[]{adresseId, e.getMessage()});
+
                 }
 
             } else if (adresseId != null) {
