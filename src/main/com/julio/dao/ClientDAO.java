@@ -312,10 +312,13 @@ public class ClientDAO extends SocieteDAO {
             );
         }
         Connection connection = dbConnexion.getConnection();
-
+        boolean originalAutoCommit = true;
         try {
-            connection.setAutoCommit(false);
-
+            originalAutoCommit = connection.getAutoCommit();
+//            connection.setAutoCommit(false);
+            if (originalAutoCommit) {
+                connection.setAutoCommit(false);
+            }
             // 1. Récupérer id_societe depuis la table client
             Integer societeId = null;
             String getSocieteIdSQL = "SELECT id_societe FROM client WHERE id_client = ?";
@@ -325,19 +328,28 @@ public class ClientDAO extends SocieteDAO {
                     if (rs.next()) {
                         societeId = rs.getInt("id_societe");
                     } else {
-                        connection.rollback();
+                        if (originalAutoCommit) {
+                            connection.rollback();
+                        }
                         LOGGER.log(Level.WARNING, "Aucun client trouvé avec l'ID {0}", client.getId());
                         return false;
                     }
                 }
             }
-            // 2. Mettre à jour la partie sociéte (via classe mère)
-            // Créer un client temporaire avec l'ID société pour la mise à jour
-            client.setId(societeId);
-            saveSociete(client);
-            client.setId(client.getId());
 
-            // 3. Mettre à jour la partie client
+            // 2. Mettre à jour la partie adresse
+            if (client.getAdresse() != null && client.getAdresse().getId() != null) {
+                adresseDAO.save(client.getAdresse(), connection);
+            }
+            // 3. Mettre à jour la partie société
+            saveSociete(client, societeId, connection);
+
+            // Metre à jour la partie client
+//            Integer originalId = client.getId();
+//            client.setId(societeId);
+//            saveSociete(client);
+//            client.setId(originalId);
+
             String query = "UPDATE client " +
                     "SET chiffre_affaires = ?, " +
                     "nb_employes = ? " +
@@ -349,17 +361,24 @@ public class ClientDAO extends SocieteDAO {
 
                 int rowsAffected = statement.executeUpdate();
                 if (rowsAffected > 0) {
-                    connection.commit();
+                    if (!connection.getAutoCommit()) {
+                        connection.commit();
+                    }
                     return true;
                 } else {
-//                    connection.rollback();
+                    if (!connection.getAutoCommit()) {
+                        connection.rollback();
+                    }
                     return false;
                 }
             }
         } catch (SQLException e) {
             try {
-                connection.rollback();
+                if (!connection.getAutoCommit()) {
+                    connection.rollback();
+                }
                 LOGGER.log(Level.WARNING, "Erreur lors de la mis à jour, rollback effectué", e);
+
             } catch (SQLException rollbackEx) {
                 LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
             }
@@ -372,9 +391,21 @@ public class ClientDAO extends SocieteDAO {
                     "Erreur lors de la mise à jour du client : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
+        } catch(DAOException e) {
+            try {
+                if (!connection.getAutoCommit()) {
+                    connection.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur DAO", e);
+                }
+            } catch (SQLException rollbackEx) {
+                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+            }
+            throw e;
         } finally {
             try {
-                connection.setAutoCommit(true);
+                if (originalAutoCommit && !connection.getAutoCommit()) {
+                    connection.setAutoCommit(true);
+                }
             } catch (SQLException e) {
                 LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", e);
             }

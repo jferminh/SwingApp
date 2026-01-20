@@ -232,11 +232,15 @@ public class AdresseDAO {
     /**
      * Met à jour une adresse existante dans la base de données.
      *
-     * @param adresse l'adresse à mettre à jour (doit avoir un ID valide)
+     * @param adresse l'adresse à mettre à jour
      * @return true si la mise à jour a réussi, false sinon
-     * @throws DAOException si une erreur survient lors de la mise à jour
+     * @throws DAOException si une erreur survient
      */
     public boolean save(Adresse adresse) throws DAOException {
+        Connection conn = dbConnexion.getConnection();
+        return save(adresse, conn);
+    }
+    public boolean save(Adresse adresse, Connection connection) throws DAOException {
         if (adresse == null || adresse.getId() == null || adresse.getId() <= 0) {
             throw new DAOException(
                     DAOException.ErrorCode.INVALID_PARAMETER,
@@ -252,10 +256,8 @@ public class AdresseDAO {
                 "code_postal = ?, " +
                 "ville = ? " +
                 "WHERE id_adresse = ?";
-        Connection connection = dbConnexion.getConnection();
         try {
-            connection.setAutoCommit(false);
-            try (PreparedStatement pstmt = dbConnexion.getConnection().prepareStatement(query)) {
+            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
                 pstmt.setString(1, adresse.getNumeroRue());
                 pstmt.setString(2, adresse.getNomRue());
                 pstmt.setString(3, adresse.getCodePostal());
@@ -263,23 +265,9 @@ public class AdresseDAO {
                 pstmt.setInt(5, adresse.getId());
 
                 int rowsAffected = pstmt.executeUpdate();
-                if (rowsAffected > 0) {
-                    connection.commit();
-//                LOGGER.log(Level.INFO, "Adresse mise à jour avec l'ID {0}", adresse.getId());
-                    return true;
-                } else {
-                    connection.rollback();
-//                LOGGER.log(Level.WARNING, "Aucune adresse trouvée avec l'ID {0} pour la mise à jour", adresse.getId());
-                    return false;
-                }
+                return rowsAffected > 0;
             }
         } catch (SQLException e) {
-            try {
-                connection.rollback();
-                LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur de mise à jour", e);
-            } catch (SQLException ex) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", ex);
-            }
             LOGGER.log(Level.SEVERE, "Erreur lors de la mise à jour de l'adresse avec ID " + adresse.getId(), e);
             throw new DAOException(
                     SQLExceptionAnalyzer.categorize(e),
@@ -288,12 +276,6 @@ public class AdresseDAO {
                     "Erreur lors de la mise à jour de l'adresse : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
-        } finally {
-            try {
-                connection.setAutoCommit(true);
-            } catch (SQLException ex) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", ex);
-            }
         }
     }
 

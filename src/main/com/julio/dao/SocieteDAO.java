@@ -141,65 +141,60 @@ public abstract class SocieteDAO {
     }
 
     /**
-     * Met à jour une société (partie commune) dans la base de données.
+     * Met à jour la partie société d'un client ou prospect dans une transaction existante.
+     * <p>
+     * Cette méthode NE gère PAS la transaction (pas de commit/rollback).
+     * Elle doit être appelée dans le contexte d'une transaction déjà démarrée.
      *
      * @param societe la société à mettre à jour
-     * @return true si la mise à jour a réussi
+     * @param societeId l'ID de la société dans la table societe
+     * @param connection la connexion avec transaction active
      * @throws DAOException si une erreur survient
      */
-    protected boolean saveSociete(Societe societe) throws DAOException {
-        if (societe == null || societe.getId() == null || societe.getId() <= 0) {
-            throw new DAOException(
-                    DAOException.ErrorCode.INVALID_PARAMETER,
-                    "saveSociete",
-                    societe != null ? societe.getId() : null,
-                    "La société doit avoir un ID valide"
-            );
-        }
-
-        // Mettre à jour l'adresse si elle a un ID
-        Adresse adresse = societe.getAdresse();
-        if (adresse != null && adresse.getId() != null) {
-            try {
-                adresseDAO.save(adresse);
-            } catch (DAOException ex) {
-                LOGGER.log(Level.SEVERE, "Erreur lors de la mise à jour de l'adresse", ex);
-                throw new DAOException(
-                        DAOException.ErrorCode.UPDATE_ERROR,
-                        "saveSociete",
-                        societe.getId(),
-                        "Erreur lors de la mise à jour de l'adresse : " + ex.getMessage(),
-                        ex
-                );
-            }
-        }
+    protected void saveSociete(Societe societe, Integer societeId, Connection connection) throws DAOException {
+//        if (societe == null || societe.getId() == null || societe.getId() <= 0) {
+//            throw new DAOException(
+//                    DAOException.ErrorCode.INVALID_PARAMETER,
+//                    "saveSociete",
+//                    societe != null ? societe.getId() : null,
+//                    "La société doit avoir un ID valide"
+//            );
+//        }
 
         // Metre à jour la société
         String query = "UPDATE societe " +
                 "SET raison_sociale = ?, " +
-                "adresse_id = ?, " +
                 "telephone = ?, " +
                 "email = ?, " +
                 "commentaires = ? " +
                 "WHERE id_societe = ?";
 
-        try (PreparedStatement preparedStatement = dbConnexion.getConnection()
-                .prepareStatement(query)) {
+        try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
             preparedStatement.setString(1, societe.getRaisonSociale());
-            preparedStatement.setInt(2, adresse.getId());
-            preparedStatement.setString(3, societe.getTelephone());
-            preparedStatement.setString(4, societe.getEmail());
-            preparedStatement.setString(5, societe.getCommentaires());
-            preparedStatement.setInt(6, societe.getId());
+            preparedStatement.setString(2, societe.getTelephone());
+            preparedStatement.setString(3, societe.getEmail());
+            preparedStatement.setString(4, societe.getCommentaires());
+            preparedStatement.setInt(5, societeId);
 
             int rowsAffected = preparedStatement.executeUpdate();
-            if (rowsAffected > 0) {
-                return true;
-            } else {
-                return false;
+            if (rowsAffected == 0) {
+                throw new SQLException(
+                        "La mise à jour de la société a échoué, aucune ligne affectée (ID=" + societeId + ")"
+                );
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "Erreur lors de la mise à jour de la société", e);
+            LOGGER.log(Level.SEVERE, "Erreur lors de la mise à jour de la société" + societeId, e);
+            if (SQLExceptionAnalyzer.isUniqueConstraintViolation(e)){
+                String constraintName = SQLExceptionAnalyzer.extractConstraintName(e);
+                throw new DAOException(
+                        DAOException.ErrorCode.UNIQUE_CONSTRAINT_VIOLATION,
+                        "saveSociete",
+                        societeId,
+                        "La raison sociale '" + societe.getRaisonSociale() + "' existe déjà" +
+                                (constraintName != null ? " (contrainte: " + constraintName + ")" : ""),
+                        e
+                );
+            }
             throw new DAOException(
                     SQLExceptionAnalyzer.categorize(e),
                     "saveSociete",
