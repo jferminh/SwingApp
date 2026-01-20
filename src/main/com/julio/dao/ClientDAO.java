@@ -344,12 +344,6 @@ public class ClientDAO extends SocieteDAO {
             // 3. Mettre à jour la partie société
             saveSociete(client, societeId, connection);
 
-            // Metre à jour la partie client
-//            Integer originalId = client.getId();
-//            client.setId(societeId);
-//            saveSociete(client);
-//            client.setId(originalId);
-
             String query = "UPDATE client " +
                     "SET chiffre_affaires = ?, " +
                     "nb_employes = ? " +
