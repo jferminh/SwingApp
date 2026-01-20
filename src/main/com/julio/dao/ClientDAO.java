@@ -223,7 +223,8 @@ public class ClientDAO extends SocieteDAO {
                     "nb_employes) " +
                     " VALUES (?, ?, ?)";
 
-            try (PreparedStatement statement = connection.prepareStatement(query)) {
+            try (PreparedStatement statement = connection.prepareStatement(query,
+                    Statement.RETURN_GENERATED_KEYS)) {
                 statement.setInt(1, societeId);
                 statement.setLong(2, client.getChiffreAffaires());
                 statement.setInt(3, client.getNbEmployes());
@@ -239,7 +240,18 @@ public class ClientDAO extends SocieteDAO {
                     if (generatedKeys.next()) {
                         Integer clientId = generatedKeys.getInt(1);
                         client.setId(clientId); // ID de la table client
+
+                        // Charger les contrats du client (vide pour un nouveau client)
+                        List<Contrat> contrats = contratDAO.findByIdClient(clientId);
+                        for (Contrat contrat : contrats) {
+                            client.ajouterContrat(contrat);
+                        }
+
                         connection.commit();
+                        LOGGER.log(Level.INFO,
+                                "Client créé avec succès : ID client={0}, ID société={1}, Raison sociale={2}, CA={3}, Nb employés={4}",
+                                new Object[]{clientId, societeId, client.getRaisonSociale(),
+                                        client.getChiffreAffaires(), client.getNbEmployes()});
                     } else {
                         throw new SQLException("L'insertion a échoué, aucun ID généré");
                     }
@@ -306,7 +318,7 @@ public class ClientDAO extends SocieteDAO {
 
             // 1. Récupérer id_societe depuis la table client
             Integer societeId = null;
-            String getSocieteIdSQL = "SELECT id_societe FROM client WHERE id = ?";
+            String getSocieteIdSQL = "SELECT id_societe FROM client WHERE id_client = ?";
             try (PreparedStatement pstmt = connection.prepareStatement(getSocieteIdSQL)) {
                 pstmt.setInt(1, client.getId());
                 try (ResultSet rs = pstmt.executeQuery()) {
@@ -340,7 +352,7 @@ public class ClientDAO extends SocieteDAO {
                     connection.commit();
                     return true;
                 } else {
-                    connection.rollback();
+//                    connection.rollback();
                     return false;
                 }
             }
