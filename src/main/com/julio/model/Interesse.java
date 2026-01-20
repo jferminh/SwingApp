@@ -2,62 +2,99 @@ package main.com.julio.model;
 
 /**
  * Énumération représentant le niveau d'intérêt d'un prospect.
- * <p>
- * Cette énumération permet de qualifier l'intérêt manifesté par un prospect
- * envers les services ou produits de l'entreprise. Chaque valeur possède
- * un libellé lisible pour l'affichage dans l'interface utilisateur.
- * </p>
- * <p>
- * Valeurs possibles :
- * </p>
- * <ul>
- *   <li>{@link #OUI} - Le prospect a manifesté un intérêt</li>
- *   <li>{@link #NON} - Le prospect n'a pas manifesté d'intérêt</li>
- * </ul>
  *
  * @author Julio FERMIN
  * @version 1.0
  * @since 19/11/2025
- * @see Prospect
  */
 public enum Interesse {
-
-    /** Le prospect est intéressé par les services/produits proposés */
-    OUI("Oui"),
-
-    /** Le prospect n'est pas intéressé par les services/produits proposés */
-    NON("Non");
-
-    /** Libellé textuel de l'intérêt pour l'affichage utilisateur */
-    private final String libelle;
+    /**
+     * Le prospect a manifesté un intérêt.
+     */
+    OUI,
 
     /**
-     * Constructeur privé de l'énumération.
-     * <p>
-     * Initialise chaque constante avec son libellé associé.
-     * </p>
-     *
-     * @param libelle représentation textuelle de la valeur d'intérêt
+     * Le prospect n'a pas manifesté d'intérêt.
      */
-    Interesse(String libelle) {
-        this.libelle = libelle;
-    }
+    NON;
 
+    /**
+     * Retourne le libellé lisible de l'enum.
+     *
+     * @return "Oui" ou "Non"
+     */
     public String getLibelle() {
-        return libelle;
+        return this == OUI ? "Oui" : "Non";
     }
 
     /**
-     * Retourne le libellé textuel de l'intérêt.
-     * <p>
-     * Cette méthode permet d'afficher directement l'énumération
-     * dans l'interface utilisateur sans conversion supplémentaire.
-     * </p>
+     * Convertit un entier (TINYINT) en Interesse.
      *
-     * @return le libellé de l'intérêt ("Oui" ou "Non")
+     * Convention MySQL TINYINT(1) :
+     * - 1 = OUI
+     * - 0 = NON
+     *
+     * @param value la valeur entière (0 ou 1)
+     * @return l'enum correspondant
+     * @throws IllegalArgumentException si la valeur n'est ni 0 ni 1
      */
-    @Override
-    public String toString() {
-        return libelle;
+    public static Interesse fromInt(int value) {
+        if (value == 1) {
+            return OUI;
+        } else if (value == 0) {
+            return NON;
+        } else {
+            throw new IllegalArgumentException(
+                    "Valeur 'interesse' invalide : " + value + ". Valeurs attendues : 0 (NON) ou 1 (OUI)"
+            );
+        }
+    }
+
+    /**
+     * Convertit l'enum en entier pour stockage en base de données.
+     *
+     * Convention MySQL TINYINT(1) :
+     * - OUI = 1
+     * - NON = 0
+     *
+     * @return 1 si OUI, 0 si NON
+     */
+    public int toInt() {
+        return this == OUI ? 1 : 0;
+    }
+
+    /**
+     * Convertit une chaîne en Interesse de manière sécurisée.
+     *
+     * @param value la valeur à convertir ("OUI", "NON", "Oui", "Non", "1", "0")
+     * @return l'enum correspondant
+     * @throws IllegalArgumentException si la valeur est invalide
+     */
+    public static Interesse fromString(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalArgumentException("La valeur 'interesse' ne peut pas être null ou vide");
+        }
+
+        String normalized = value.trim().toUpperCase();
+
+        // Gestion des valeurs textuelles
+        if ("OUI".equals(normalized) || "YES".equals(normalized)) {
+            return OUI;
+        }
+        if ("NON".equals(normalized) || "NO".equals(normalized)) {
+            return NON;
+        }
+
+        // Gestion des valeurs numériques
+        if ("1".equals(normalized)) {
+            return OUI;
+        }
+        if ("0".equals(normalized)) {
+            return NON;
+        }
+
+        throw new IllegalArgumentException(
+                "Valeur 'interesse' invalide : '" + value + "'. Valeurs attendues : OUI, NON, 1, 0"
+        );
     }
 }

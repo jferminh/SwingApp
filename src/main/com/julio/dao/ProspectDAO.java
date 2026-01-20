@@ -194,9 +194,9 @@ public class ProspectDAO extends SocieteDAO {
                     "VALUES (?, ?, ?)";
 
             try (PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-                pstmt.setInt(1, societeId);  // ✅ FK vers societe
+                pstmt.setInt(1, societeId);
                 pstmt.setDate(2, Date.valueOf(prospect.getDateProspection()));
-                pstmt.setString(3, prospect.getInteresse().name());
+                pstmt.setInt(3, prospect.getInteresse().toInt());
 
                 int rowsAffected = pstmt.executeUpdate();
 
@@ -280,11 +280,15 @@ public class ProspectDAO extends SocieteDAO {
         }
 
         Connection conn = dbConnexion.getConnection();
+        boolean originalAutoCommit = true;
 
         try {
-            conn.setAutoCommit(false);
+            originalAutoCommit = conn.getAutoCommit();
 
-            // 1. Récupérer id_societe depuis la table prospect
+            if (originalAutoCommit) {
+                conn.setAutoCommit(false);
+            }
+            // Récupérer id_societe depuis la table prospect
             Integer societeId = null;
             String getSocieteIdSQL = "SELECT id_societe FROM prospect WHERE id_prospect = ?";
             try (PreparedStatement pstmt = conn.prepareStatement(getSocieteIdSQL)) {
@@ -293,38 +297,45 @@ public class ProspectDAO extends SocieteDAO {
                     if (rs.next()) {
                         societeId = rs.getInt("id_societe");
                     } else {
-                        conn.rollback();
+                        if (originalAutoCommit) {
+                            conn.rollback();
+                        }
                         LOGGER.log(Level.WARNING, "Aucun prospect trouvé avec l'ID {0}", prospect.getId());
                         return false;
                     }
                 }
             }
 
-            // 2. Mettre à jour la partie société (via classe mère)
-            // Créer un prospect temporaire avec l'ID société pour la mise à jour
-            Integer originalId = prospect.getId();
-            prospect.setId(societeId);  // Temporairement
-            saveSociete(prospect);
-            prospect.setId(originalId);  // Restaurer l'ID prospect
+            // Metre à jour l'adresse
+            if (prospect.getAdresse() != null && prospect.getAdresse().getId() != null) {
+                adresseDAO.save(prospect.getAdresse(), conn);
+            }
 
-            // 3. Mettre à jour la partie prospect
-            String sql = "UPDATE prospect SET date_prospection = ?, interesse = ? WHERE id = ?";
+            // Mettre à jour la partie société
+            saveSociete(prospect, societeId, conn);
+
+            // Mettre à jour la partie prospect
+            String sql = "UPDATE prospect SET date_prospection = ?, interesse = ? WHERE id_prospect = ?";
 
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 pstmt.setDate(1, Date.valueOf(prospect.getDateProspection()));
-                pstmt.setString(2, prospect.getInteresse().name());
+                pstmt.setInt(2, prospect.getInteresse().toInt());
                 pstmt.setInt(3, prospect.getId());
 
                 int rowsAffected = pstmt.executeUpdate();
 
                 if (rowsAffected > 0) {
-                    conn.commit();
-                    LOGGER.log(Level.INFO,
-                            "Prospect mis à jour avec succès : ID prospect={0}, ID société={1}, Date={2}, Intéressé={3}",
-                            new Object[]{prospect.getId(), societeId, prospect.getDateProspection(), prospect.getInteresse()});
+                    if (!conn.getAutoCommit()) {
+                        conn.commit();
+                        LOGGER.log(Level.INFO,
+                                "Prospect mis à jour avec succès : ID prospect={0}, ID société={1}, Date={2}, Intéressé={3}",
+                                new Object[]{prospect.getId(), societeId, prospect.getDateProspection(), prospect.getInteresse()});
+                    }
                     return true;
                 } else {
-                    conn.rollback();
+                    if (!conn.getAutoCommit()) {
+                        conn.rollback();
+                    }
                     LOGGER.log(Level.WARNING, "Aucun prospect trouvé avec l'ID {0} pour la mise à jour",
                             prospect.getId());
                     return false;
@@ -333,8 +344,10 @@ public class ProspectDAO extends SocieteDAO {
 
         } catch (SQLException e) {
             try {
-                conn.rollback();
-                LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur de mise à jour", e);
+                if (!conn.getAutoCommit()) {
+                    conn.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur de mise à jour", e);
+                }
             } catch (SQLException rollbackEx) {
                 LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
             }
@@ -349,15 +362,19 @@ public class ProspectDAO extends SocieteDAO {
             );
         } catch (DAOException e) {
             try {
-                conn.rollback();
-                LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur DAO", e);
+                if (!conn.getAutoCommit()) {
+                    conn.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur DAO", e);
+                }
             } catch (SQLException rollbackEx) {
                 LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
             }
             throw e;
         } finally {
             try {
-                conn.setAutoCommit(true);
+                if (originalAutoCommit && !conn.getAutoCommit()) {
+                    conn.setAutoCommit(true);
+                }
             } catch (SQLException e) {
                 LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", e);
             }
@@ -535,39 +552,72 @@ public class ProspectDAO extends SocieteDAO {
      * @param rs le ResultSet contenant les données du prospect
      * @return un objet Prospect reconstitué
      * @throws SQLException si une erreur survient lors de la lecture du ResultSet
-     * @throws ValidationException si les données ne respectent pas les contraintes métier
+     * @throws DAOException si les données ne respectent pas les contraintes métier
      */
-    private Prospect mapResultSetToProspect(ResultSet rs) throws SQLException, ValidationException {
-        // Reconstituer l'adresse
-        Adresse adresse = new Adresse(
-                rs.getString("numero_rue"),
-                rs.getString("nom_rue"),
-                rs.getString("code_postal"),
-                rs.getString("ville")
-        );
-        adresse.setId(rs.getInt("adresse_id"));
+    private Prospect mapResultSetToProspect(ResultSet rs) throws SQLException, DAOException, ValidationException {
+        try {
+            Integer prospectId = rs.getInt("p.id_prospect");
+            Integer societeId = rs.getInt("p.id_societe");
+            String raisonSociale = rs.getString("s.raison_sociale");
+            String telephone = rs.getString("s.telephone");
+            String email = rs.getString("s.email");
+            String commentaires = rs.getString("s.commentaires");
 
-        // Reconstituer le prospect
-        Date dateProspection = rs.getDate("date_prospection");
-        LocalDate localDate = dateProspection.toLocalDate();
+            // Adresse
+            Integer adresseId = rs.getInt("s.adresse_id");
+            String numeroRue = rs.getString("a.numero_rue");
+            String nomRue = rs.getString("a.nom_rue");
+            String codePostal = rs.getString("a.code_postal");
+            String ville = rs.getString("a.ville");
 
-        String interesseStr = rs.getString("interesse");
-        Interesse interesse = Interesse.valueOf(interesseStr);
-//        Interesse interesse = Interesse.valueOf(interesseStr);
+            Adresse adresse = new Adresse(numeroRue, nomRue, codePostal, ville);
+            adresse.setId(adresseId);
 
-        Prospect prospect = new Prospect(
-                rs.getString("raison_sociale"),
-                adresse,
-                rs.getString("telephone"),
-                rs.getString("email"),
-                rs.getString("commentaires"),
-                localDate,
-                interesse
-        );
+            // Prospect spécifique
+            java.sql.Date sqlDate = rs.getDate("p.date_prospection");
+            LocalDate dateProspection = sqlDate != null ? sqlDate.toLocalDate() : null;
 
-        // Définir l'ID prospect (pas l'ID société)
-        prospect.setId(rs.getInt("prospect_id"));
+            int interesseInt = rs.getInt("p.interesse");
+            Interesse interesse = Interesse.fromInt(interesseInt);
 
-        return prospect;
+            // Créer le prospect
+            Prospect prospect = new Prospect(
+                    raisonSociale,
+                    adresse,
+                    telephone,
+                    email,
+                    commentaires,
+                    dateProspection,
+                    interesse
+            );
+
+            prospect.setId(prospectId);
+
+            LOGGER.log(Level.FINE,
+                    "Prospect mappé : ID={0}, Raison sociale={1}, Intéressé={2}",
+                    new Object[]{prospectId, raisonSociale, interesse});
+
+            return prospect;
+
+        } catch (ValidationException e) {
+            LOGGER.log(Level.SEVERE, "Erreur de validation lors du mapping du prospect", e);
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "mapResultSetToProspect",
+                    null,
+                    "Données invalides lors du mapping du prospect : " + e.getMessage(),
+                    e
+            );
+        } catch (IllegalArgumentException e) {
+            LOGGER.log(Level.SEVERE,
+                    "Valeur 'interesse' invalide dans la BDD : " + rs.getInt("p.interesse"), e);
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "mapResultSetToProspect",
+                    null,
+                    e.getMessage(),
+                    e
+            );
+        }
     }
 }
