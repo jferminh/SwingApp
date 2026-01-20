@@ -238,7 +238,7 @@ public abstract class SocieteDAO {
                     return true;
                 } else {
                     connection.rollback();
-//                    LOGGER.log(Level.WARNING, "Aucune société trouve avec l'ID {0}", id);
+//                    LOGGER.log(Level.WARNING, "Aucune société trouvée avec l'ID {0}", id);
                     return false;
                 }
             }

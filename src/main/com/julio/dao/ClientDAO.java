@@ -10,6 +10,7 @@ import main.com.julio.util.SQLExceptionAnalyzer;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -233,7 +234,17 @@ public class ClientDAO extends SocieteDAO {
                     throw new SQLException("L'insértion du client a échoué, aucune ligne affectée");
                 }
 
-                connection.commit();
+                // Récupérer l'ID généré pour le client
+                try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        Integer clientId = generatedKeys.getInt(1);
+                        client.setId(clientId); // ID de la table client
+                        connection.commit();
+                    } else {
+                        throw new SQLException("L'insertion a échoué, aucun ID généré");
+                    }
+
+                }
 //                LOGGER.log(Level.INFO, "Client crée avec l'ID {0}", societeId);
                 return client;
             }
@@ -292,10 +303,29 @@ public class ClientDAO extends SocieteDAO {
 
         try {
             connection.setAutoCommit(false);
-            // 1. Mettre à jour la partie sociéte
-            saveSociete(client);
 
-            // 2. Mettre à jour la partie client
+            // 1. Récupérer id_societe depuis la table client
+            Integer societeId = null;
+            String getSocieteIdSQL = "SELECT id_societe FROM client WHERE id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(getSocieteIdSQL)) {
+                pstmt.setInt(1, client.getId());
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        societeId = rs.getInt("id_societe");
+                    } else {
+                        connection.rollback();
+                        LOGGER.log(Level.WARNING, "Aucun client trouvé avec l'ID {0}", client.getId());
+                        return false;
+                    }
+                }
+            }
+            // 2. Mettre à jour la partie sociéte (via classe mère)
+            // Créer un client temporaire avec l'ID société pour la mise à jour
+            client.setId(societeId);
+            saveSociete(client);
+            client.setId(client.getId());
+
+            // 3. Mettre à jour la partie client
             String query = "UPDATE client " +
                     "SET chiffre_affaires = ?, " +
                     "nb_employes = ? " +
@@ -322,7 +352,6 @@ public class ClientDAO extends SocieteDAO {
                 LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
             }
 
-//            String detailedMessage = analyzeSQLException(e);
             LOGGER.log(Level.SEVERE, "Erreur lors de la mise à jour du client ID= " + client.getId(), e);
             throw new DAOException(
                     SQLExceptionAnalyzer.categorize(e),
@@ -344,13 +373,14 @@ public class ClientDAO extends SocieteDAO {
      * Supprime un client de la base de données avec transaction.
      * <p>
      * IMPORTANT : La suppression est interdite si le client possède des contrats.
-     * Une exception métier sera levée dans ce cas.
      * <p>
-     * Processus de suppression :
+     * Processus de suppression en respectant les FK :
      * 1. Vérifie que le client n'a aucun contrat associé
-     * 2. Supprime l'enregistrement client (table client)
-     * 3. Supprime l'enregistrement société (table societe)
-     * 4. L'adresse est conservée (peut être référencée par d'autres entités)
+     * 2. Récupère l'ID de l'adresse avant suppression
+     * 3. Supprime l'enregistrement client (table client)
+     * 4. Supprime l'enregistrement société (table societe)
+     * 5. Vérifie si l'adresse est référencée par d'autres sociétés
+     * 6. Si l'adresse n'est plus référencée, la supprime également
      * <p>
      * Note : Si la suppression échoue à n'importe quelle étape,
      * toute la transaction est annulée (rollback).
@@ -371,37 +401,36 @@ public class ClientDAO extends SocieteDAO {
         }
 
         Connection connection = dbConnexion.getConnection();
+        Integer societeId = null;
+        Integer adresseId = null;
         try {
             connection.setAutoCommit(false);
 
-            // 1. Véri
-            // Vérifier s'il existe des contrats liés à ce client
-            String query = "SELECT COUNT(*) FROM contrat WHERE client_id = ?";
+            // 1. Vérifier que le client n'a pas de contrats
+            List<Contrat> contrats = contratDAO.findByIdClient(id);
 
-            try (PreparedStatement statement = connection.prepareStatement(query)) {
-                statement.setInt(1, id);
+            if (contrats == null || contrats.isEmpty()) {
+                connection.rollback();
+                LOGGER.log(Level.WARNING,
+                        "Impossible de supprimer le client ID={0} : {1} contrat(s) associé(s)",
+                        new Object[]{id, contrats.size()});
 
-                try (ResultSet rs = statement.executeQuery()) {
-                    if (rs.next() && rs.getInt(1) > 0) {
-                        int count = rs.getInt(1);
-                        connection.rollback();
-                        String errorMsg = String.format(
-                                "Impossible de supprimer le client ID %d : %d contrat(s) y sont liés. " +
-                                        "Supprimez d'abord les contrats associés.", id, count);
-                        LOGGER.log(Level.SEVERE, errorMsg);
-                        throw new DAOException(
-                                DAOException.ErrorCode.FOREIGN_KEY_VIOLATION,
-                                "delete",
-                                id,
-                                errorMsg + ". Supprimez d'abord les contrats associés."
-                        );
-                    }
-                }
+                throw new DAOException(
+                        DAOException.ErrorCode.FOREIGN_KEY_VIOLATION,
+                        "delete",
+                        id,
+                        String.format(
+                                "Impossible de supprimer le client : %d contrat(s) associé(s) trouvé(s). " +
+                                        "Veuillez d'abord supprimer les contrats.",
+                                contrats.size()
+                        )
+                );
             }
 
-            // Récupérer l'adresse_id avant de supprimer la société
-            Integer adresseId = null;
-            String getAdresseSQL = "SELECT s.adresse_id " +
+            // 2. Récupérer id_societe et l'adresse_id avant de supprimer la société
+            String getAdresseSQL = "SELECT " +
+                    "c.id_societe," +
+                    "s.adresse_id " +
                     "FROM client c " +
                     "INNER JOIN societe s ON c.id_societe = s.id_societe " +
                     "WHERE c.id_client = ?";
@@ -409,41 +438,76 @@ public class ClientDAO extends SocieteDAO {
                 statement.setInt(1, id);
                 try (ResultSet rs = statement.executeQuery()) {
                     if (rs.next()) {
+                        societeId = rs.getInt("id_societe");
                         adresseId = rs.getInt("adresse_id");
+                    } else {
+                        connection.rollback();
+                        LOGGER.log(Level.WARNING, "Aucun client trouvé avec l'ID {0}", id);
+                        return false;
                     }
                 }
             }
 
-            //Supprimer l'enregistrement client
+            // 3. Supprimer l'enregistrement client
             String deleteClientSql = "DELETE FROM client WHERE id_client = ?";
             try (PreparedStatement statement = connection.prepareStatement(deleteClientSql)) {
                 statement.setInt(1, id);
                 int rowsAffected = statement.executeUpdate();
 
-                if (rowsAffected == 0) {
-                    connection.rollback();
-                    LOGGER.log(Level.WARNING, "Aucun client trouvé avec l'ID {0}", id);
-                    return false;
+//                if (rowsAffected == 0) {
+//                    connection.rollback();
+//                    LOGGER.log(Level.WARNING, "Aucun client trouvé avec l'ID {0}", id);
+//                    return false;
+//                }
+            }
+
+            // 4. Supprimer l'enregistrement société
+            String deleteSocieteSql = "DELETE FROM societe WHERE id_societe = ?";
+            try (PreparedStatement statement = connection.prepareStatement(deleteSocieteSql)) {
+                statement.setInt(1, societeId);
+                statement.executeUpdate();
+            }
+
+            // 5. VÉRIFIER SI L'ADRESSE EST RÉFÉRENCÉE PAR D'AUTRES SOCIÉTÉS
+            boolean adresseEstReferenciee = false;
+            if (adresseId != null) {
+                String checkAdresseSQL = "SELECT COUNT(*) AS nb FROM societe WHERE adresse_id = ?";
+                try (PreparedStatement statement = connection.prepareStatement(checkAdresseSQL)) {
+                    statement.setInt(1, adresseId);
+                    try (ResultSet rs = statement.executeQuery()) {
+                        if (rs.next()) {
+                            int nbReferences = rs.getInt("nb");
+                            adresseEstReferenciee = (nbReferences > 0);
+                            LOGGER.log(Level.FINE,
+                                    "Adresse ID={0} : {1} référence(s) trouvée(s)",
+                                    new Object[]{adresseId, nbReferences});
+                        }
+                    }
                 }
             }
 
+            // 6. Supprimer l'adresse si elle n'est plus référencée
+            if (adresseId != null && !adresseEstReferenciee) {
+                String deleteAdresseSql = "DELETE FROM adresse WHERE id_adresse = ?";
+                try (PreparedStatement statement = connection.prepareStatement(deleteAdresseSql)) {
+                    statement.setInt(1, adresseId);
+                    int rowsAffected = statement.executeUpdate();
+                    if (rowsAffected > 0) {
+                        LOGGER.log(Level.INFO,
+                                "Adresse supprimée car non référencée : ID={0}", adresseId);
+                    }
+                }
 
-            // Supprimer l'enregistrement société
-            String deleteSocieteSql = "DELETE FROM client WHERE id_client = ?";
-            try (PreparedStatement statement = connection.prepareStatement(deleteSocieteSql)) {
-                statement.setInt(1, id);
-                statement.executeUpdate();
-            }
-
-            // Supprimer l'enregistrement adresse
-            String deleteAdresseSql = "DELETE FROM adresse WHERE id_adresse = ?";
-            try (PreparedStatement statement = connection.prepareStatement(deleteAdresseSql)) {
-                statement.setInt(1, adresseId);
-                statement.executeUpdate();
+            } else if (adresseId != null) {
+                LOGGER.log(Level.INFO,
+                        "Adresse conservée car référencée par d'autres sociétés : ID={0}", adresseId);
             }
 
             connection.commit();
-            LOGGER.log(Level.INFO, "Client supprimé avec l'ID {0}", id);
+            LOGGER.log(Level.INFO,
+                    "Client supprimé avec succès : ID client={0}, ID société={1}, Adresse {2}",
+                    new Object[]{id, societeId,
+                            adresseEstReferenciee ? "conservée (ID=" + adresseId + ")" : "supprimée (ID=" + adresseId + ")"});
             return true;
         } catch (SQLException e) {
             try {
@@ -481,7 +545,7 @@ public class ClientDAO extends SocieteDAO {
      * @throws ValidationException si les données ne respectent pas les règles métier
      */
     private Client mapResultSetToClient(ResultSet rs) throws SQLException, ValidationException {
-        // Créer l'adresse
+        // Reconstituer l'adresse
         Adresse adresse = new Adresse(
                 rs.getString("numero_rue"),
                 rs.getString("nom_rue"),
@@ -490,7 +554,7 @@ public class ClientDAO extends SocieteDAO {
         );
         adresse.setId(rs.getInt("id_societe"));
 
-        // Créer le client
+        // Reconstituer le client
         Client client = new Client(
                 rs.getString("raison_sociale"),
                 adresse,
