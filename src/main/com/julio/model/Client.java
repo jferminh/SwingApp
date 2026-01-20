@@ -2,6 +2,9 @@ package main.com.julio.model;
 
 import main.com.julio.exception.ValidationException;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Classe représentant un client dans le système de gestion.
  * <p>
@@ -19,7 +22,7 @@ import main.com.julio.exception.ValidationException;
  * </ul>
  *
  * @author Julio FERMIN
- * @version 1.0
+ * @version 2.0
  * @since 19/11/2025
  * @see Societe
  * @see Contrat
@@ -36,7 +39,7 @@ public class Client extends Societe {
     private int nbEmployes;
 
     /** Liste des contrats associés au client */
-//    private List<Contrat> contrats;
+    private List<Contrat> contrats;
 
     /**
      * Constructeur principal de la classe Client.
@@ -58,10 +61,10 @@ public class Client extends Societe {
     public Client(String raisonSociale, Adresse adresse, String telephone,
                   String email, String commentaires, long chiffreAffaires,
                   int nbEmployes) throws ValidationException {
-        super(null, raisonSociale, adresse, telephone, email, commentaires);
+        super(raisonSociale, adresse, telephone, email, commentaires);
         setChiffreAffaires(chiffreAffaires);
         setNbEmployes(nbEmployes);
-//        this.contrats = new ArrayList<>();
+        this.contrats = new ArrayList<>();
     }
 
     public long getChiffreAffaires() {
@@ -78,9 +81,9 @@ public class Client extends Societe {
      *
      * @return une nouvelle liste contenant les contrats du client
      */
-//    public List<Contrat> getContrats() {
-//        return new ArrayList<>(contrats);
-//    }
+    public List<Contrat> getContrats() {
+        return new ArrayList<>(contrats);
+    }
 
     /**
      * Modifie le chiffre d'affaires du client avec validation métier.
@@ -115,11 +118,11 @@ public class Client extends Societe {
      *
      * @param contrat le contrat à ajouter
      */
-//    public void ajouterContrat(Contrat contrat) {
-//        if (contrat != null && !contrats.contains(contrat)) {
-//            contrats.add(contrat);
-//        }
-//    }
+    public void ajouterContrat(Contrat contrat) {
+        if (contrat != null && !contrats.contains(contrat)) {
+            contrats.add(contrat);
+        }
+    }
 
     /**
      * Supprime un contrat de la liste des contrats du client.
@@ -129,9 +132,11 @@ public class Client extends Societe {
      *
      * @param contrat le contrat à supprimer
      */
-//    public void supprimerContrat(Contrat contrat) {
-//        contrats.remove(contrat);
-//    }
+    public void supprimerContrat(Contrat contrat) {
+        if (contrat != null) {
+            contrats.remove(contrat);
+        }
+    }
 
     /**
      * Réinitialise le compteur d'identifiants des clients à 1.

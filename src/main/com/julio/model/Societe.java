@@ -25,7 +25,6 @@ public abstract class Societe {
      * Constructeur principal de la classe Societe.
      * Initialise une société avec validation des données obligatoires.
      *
-     * @param id identifiant unique de la société
      * @param raisonSociale raison sociale de la société (ne peut pas être vide)
      * @param adresse adresse complète de la société (ne peut pas être null)
      * @param telephone numéro de téléphone (doit respecter le format validé)
@@ -33,9 +32,9 @@ public abstract class Societe {
      * @param commentaires notes additionnelles (peut être null ou vide)
      * @throws ValidationException si une des validations échoue
      */
-    public Societe(Integer id, String raisonSociale, Adresse adresse, String telephone,
+    public Societe(String raisonSociale, Adresse adresse, String telephone,
                    String email, String commentaires) throws ValidationException {
-        this.id = id;
+//        this.id = id;
         setRaisonSociale(raisonSociale);
         setAdresse(adresse);
         setTelephone(telephone);
