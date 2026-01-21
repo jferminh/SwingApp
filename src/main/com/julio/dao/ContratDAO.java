@@ -15,14 +15,14 @@ import java.util.logging.Logger;
 /**
  * Classe DAO pour la gestion des contrats en base de données.
  * Implémente le pattern Data Access Object (DAO) pour l'entité Contrat.
- *
+ * <p>
  * Cette classe gère les opérations CRUD sur les contrats et permet
  * de récupérer les contrats associés à un client spécifique.
  * Les transactions sont utilisées pour garantir l'intégrité des données.
  *
  * @author Julio FERMIN
- * @version 2.0
- * @since 15/01/2026
+ * @version 2.1
+ * @since 21/01/2026
  */
 public class ContratDAO {
 
@@ -52,7 +52,7 @@ public class ContratDAO {
 
     /**
      * Récupère tous les contrats de la base de données.
-     *
+     * <p>
      * Cette méthode retourne tous les contrats sans filtrage, triés par ID.
      * Pour récupérer les contrats d'un client spécifique, utilisez findByIdClient().
      *
@@ -60,21 +60,32 @@ public class ContratDAO {
      * @throws DAOException si une erreur survient lors de la requête
      */
     public List<Contrat> findAll() throws DAOException {
-
         List<Contrat> contrats = new ArrayList<>();
-        String sql = "SELECT id_contrat, " +
-                "client_id, " +
-                "nom_contrat, " +
-                "montant " +
-                "FROM contrat " +
-                "ORDER BY id";
 
-        try (Statement stmt = dbConnection.getConnection().createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+        String sql = "SELECT id_contrat, client_id, nom_contrat, montant " +
+                "FROM contrat " +
+                "ORDER BY id_contrat";
+
+        Statement stmt = null;
+        ResultSet rs = null;
+
+        try {
+            // ✅ CORRECTION : Ne pas utiliser try-with-resources sur connexion
+            Connection connection = dbConnection.getConnection();
+            stmt = connection.createStatement();
+            rs = stmt.executeQuery(sql);
 
             while (rs.next()) {
-                Contrat contrat = mapResultSetToContrat(rs);
-                contrats.add(contrat);
+                try {
+                    Contrat contrat = mapResultSetToContrat(rs);
+                    contrats.add(contrat);
+
+                } catch (ValidationException e) {
+                    Integer contratId = rs.getInt("id_contrat");
+                    LOGGER.log(Level.WARNING,
+                            "Contrat ID={0} ignoré : données invalides - {1}",
+                            new Object[]{contratId, e.getMessage()});
+                }
             }
 
             return contrats;
@@ -88,15 +99,23 @@ public class ContratDAO {
                     "Erreur lors de la récupération de tous les contrats : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
-        } catch (ValidationException e) {
-            LOGGER.log(Level.SEVERE, "Erreur de validation lors du mapping dans findAll()", e);
-            throw new DAOException(
-                    DAOException.ErrorCode.READ_ERROR,
-                    "findAll",
-                    null,
-                    "Erreur de validation des données du contrat : " + e.getMessage(),
-                    e
-            );
+        } finally {
+            // ✅ IMPORTANT : Fermer SEULEMENT ResultSet et Statement
+            if (rs != null) {
+                try {
+                    rs.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
+                }
+            }
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture Statement", e);
+                }
+            }
+            // ❌ NE PAS fermer connection (Singleton)
         }
     }
 
@@ -118,25 +137,39 @@ public class ContratDAO {
             );
         }
 
-        String sql = "SELECT id_contrat, " +
-                "client_id, " +
-                "nom_contrat, " +
-                "montant " +
+        String sql = "SELECT id_contrat, client_id, nom_contrat, montant " +
                 "FROM contrat " +
                 "WHERE id_contrat = ?";
 
-        try (PreparedStatement pstmt = dbConnection.getConnection().prepareStatement(sql)) {
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
 
+        try {
+            // ✅ CORRECTION : Ne pas utiliser try-with-resources sur connexion
+            Connection connection = dbConnection.getConnection();
+            pstmt = connection.prepareStatement(sql);
             pstmt.setInt(1, id);
+            rs = pstmt.executeQuery();
 
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
+            if (rs.next()) {
+                try {
                     Contrat contrat = mapResultSetToContrat(rs);
 
                     return contrat;
-                } else {
-                    return null;
+
+                } catch (ValidationException e) {
+                    LOGGER.log(Level.SEVERE,
+                            "Erreur de validation lors du mapping du contrat ID={0}", id);
+                    throw new DAOException(
+                            DAOException.ErrorCode.INVALID_PARAMETER,
+                            "findById",
+                            id,
+                            "Données invalides pour le contrat : " + e.getMessage(),
+                            e
+                    );
                 }
+            } else {
+                return null;
             }
 
         } catch (SQLException e) {
@@ -148,15 +181,23 @@ public class ContratDAO {
                     "Erreur lors de la recherche du contrat : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
-        } catch (ValidationException e) {
-            LOGGER.log(Level.SEVERE, "Erreur de validation lors du mapping dans findById, ID=" + id, e);
-            throw new DAOException(
-                    DAOException.ErrorCode.READ_ERROR,
-                    "findById",
-                    id,
-                    "Erreur de validation des données du contrat : " + e.getMessage(),
-                    e
-            );
+        } finally {
+            // ✅ IMPORTANT : Fermer SEULEMENT ResultSet et PreparedStatement
+            if (rs != null) {
+                try {
+                    rs.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
+                }
+            }
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
+            }
+            // ❌ NE PAS fermer connection (Singleton)
         }
     }
 
@@ -181,22 +222,32 @@ public class ContratDAO {
         }
 
         List<Contrat> contrats = new ArrayList<>();
-        String sql = "SELECT id_contrat, " +
-                "client_id, " +
-                "nom_contrat, " +
-                "montant " +
+
+        String sql = "SELECT id_contrat, client_id, nom_contrat, montant " +
                 "FROM contrat " +
                 "WHERE client_id = ? " +
                 "ORDER BY id_contrat";
 
-        try (PreparedStatement pstmt = dbConnection.getConnection().prepareStatement(sql)) {
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
 
+        try {
+            // ✅ CORRECTION : Ne pas utiliser try-with-resources sur connexion
+            Connection connection = dbConnection.getConnection();
+            pstmt = connection.prepareStatement(sql);
             pstmt.setInt(1, clientId);
+            rs = pstmt.executeQuery();
 
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
+            while (rs.next()) {
+                try {
                     Contrat contrat = mapResultSetToContrat(rs);
                     contrats.add(contrat);
+
+                } catch (ValidationException e) {
+                    Integer contratId = rs.getInt("id_contrat");
+                    LOGGER.log(Level.WARNING,
+                            "Contrat ID={0} ignoré pour client ID={1} : {2}",
+                            new Object[]{contratId, clientId, e.getMessage()});
                 }
             }
 
@@ -211,16 +262,23 @@ public class ContratDAO {
                     "Erreur lors de la recherche des contrats du client : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
-        } catch (ValidationException e) {
-            LOGGER.log(Level.SEVERE,
-                    "Erreur de validation lors du mapping dans findByIdClient, clientId=" + clientId, e);
-            throw new DAOException(
-                    DAOException.ErrorCode.READ_ERROR,
-                    "findByIdClient",
-                    clientId,
-                    "Erreur de validation des données du contrat : " + e.getMessage(),
-                    e
-            );
+        } finally {
+            // ✅ IMPORTANT : Fermer SEULEMENT ResultSet et PreparedStatement
+            if (rs != null) {
+                try {
+                    rs.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
+                }
+            }
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
+            }
+            // ❌ NE PAS fermer connection (Singleton)
         }
     }
 
@@ -244,46 +302,53 @@ public class ContratDAO {
             );
         }
 
-        String sql = "INSERT INTO contrat (client_id, " +
-                "nom_contrat, " +
-                "montant) " +
+        String sql = "INSERT INTO contrat (client_id, nom_contrat, montant) " +
                 "VALUES (?, ?, ?)";
-        Connection conn = dbConnection.getConnection();
+
+        Connection connection = null;
+        PreparedStatement pstmt = null;
+        ResultSet generatedKeys = null;
 
         try {
-            conn.setAutoCommit(false);
+            // ✅ CORRECTION : Récupérer la connexion sans try-with-resources
+            connection = dbConnection.getConnection();
+            connection.setAutoCommit(false);
 
-            try (PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            pstmt.setInt(1, contrat.getClientId());
+            pstmt.setString(2, contrat.getNomContrat());
+            pstmt.setDouble(3, contrat.getMontant());
 
-                pstmt.setInt(1, contrat.getClientId());
-                pstmt.setString(2, contrat.getNomContrat());
-                pstmt.setDouble(3, contrat.getMontant());
+            int rowsAffected = pstmt.executeUpdate();
 
-                int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected == 0) {
+                throw new SQLException("L'insertion du contrat a échoué, aucune ligne affectée");
+            }
 
-                if (rowsAffected == 0) {
-                    throw new SQLException("L'insertion du contrat a échoué, aucune ligne affectée");
-                }
+            generatedKeys = pstmt.getGeneratedKeys();
 
-                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        contrat.setId(generatedKeys.getInt(1));
-                        conn.commit();
+            if (generatedKeys.next()) {
+                Integer contratId = generatedKeys.getInt(1);
+                contrat.setId(contratId);
 
-                    } else {
-                        throw new SQLException("L'insertion a échoué, aucun ID généré");
-                    }
-                }
+                // ✅ COMMIT : Transaction réussie
+                connection.commit();
 
                 return contrat;
+
+            } else {
+                throw new SQLException("L'insertion a échoué, aucun ID généré");
             }
 
         } catch (SQLException e) {
-            try {
-                conn.rollback();
-                LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur de création", e);
-            } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+            // ✅ ROLLBACK en cas d'erreur SQL
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur SQL", e);
+                } catch (SQLException rollbackEx) {
+                    LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+                }
             }
 
             LOGGER.log(Level.SEVERE, "Erreur SQL lors de la création du contrat", e);
@@ -309,11 +374,33 @@ public class ContratDAO {
                     e
             );
         } finally {
-            try {
-                conn.setAutoCommit(true);
-            } catch (SQLException e) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", e);
+            // ✅ IMPORTANT : Fermer toutes les ressources et réactiver autoCommit
+            if (generatedKeys != null) {
+                try {
+                    generatedKeys.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet generatedKeys", e);
+                }
             }
+
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
+            }
+
+            // ✅ CRUCIAL : Réactiver autoCommit
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
+                }
+            }
+
+            // ❌ NE PAS fermer connection (Singleton)
         }
     }
 
@@ -338,37 +425,43 @@ public class ContratDAO {
         }
 
         String sql = "UPDATE contrat " +
-                "SET nom_contrat = ?, " +
-                "montant = ? " +
+                "SET nom_contrat = ?, montant = ? " +
                 "WHERE id_contrat = ?";
-        Connection conn = dbConnection.getConnection();
+
+        Connection connection = null;
+        PreparedStatement pstmt = null;
 
         try {
-            conn.setAutoCommit(false);
+            // ✅ CORRECTION : Récupérer la connexion sans try-with-resources
+            connection = dbConnection.getConnection();
+            connection.setAutoCommit(false);
 
-            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt = connection.prepareStatement(sql);
+            pstmt.setString(1, contrat.getNomContrat());
+            pstmt.setDouble(2, contrat.getMontant());
+            pstmt.setInt(3, contrat.getId());
 
-                pstmt.setString(1, contrat.getNomContrat());
-                pstmt.setDouble(2, contrat.getMontant());
-                pstmt.setInt(3, contrat.getId());
+            int rowsAffected = pstmt.executeUpdate();
 
-                int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected > 0) {
+                // ✅ COMMIT : Transaction réussie
+                connection.commit();
 
-                if (rowsAffected > 0) {
-                    conn.commit();
-                    return true;
-                } else {
-                    conn.rollback();
-                    return false;
-                }
+                return true;
+            } else {
+                connection.rollback();
+                return false;
             }
 
         } catch (SQLException e) {
-            try {
-                conn.rollback();
-                LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur de mise à jour", e);
-            } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+            // ✅ ROLLBACK en cas d'erreur SQL
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur SQL", e);
+                } catch (SQLException rollbackEx) {
+                    LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+                }
             }
 
             LOGGER.log(Level.SEVERE, "Erreur SQL lors de la mise à jour du contrat ID=" + contrat.getId(), e);
@@ -380,11 +473,25 @@ public class ContratDAO {
                     e
             );
         } finally {
-            try {
-                conn.setAutoCommit(true);
-            } catch (SQLException e) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", e);
+            // ✅ IMPORTANT : Fermer toutes les ressources et réactiver autoCommit
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
             }
+
+            // ✅ CRUCIAL : Réactiver autoCommit
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
+                }
+            }
+
+            // ❌ NE PAS fermer connection (Singleton)
         }
     }
 
@@ -408,31 +515,38 @@ public class ContratDAO {
             );
         }
 
-        Connection conn = dbConnection.getConnection();
+        Connection connection = null;
+        PreparedStatement pstmt = null;
 
         try {
-            conn.setAutoCommit(false);
+            // ✅ CORRECTION : Récupérer la connexion sans try-with-resources
+            connection = dbConnection.getConnection();
+            connection.setAutoCommit(false);
+
             String sql = "DELETE FROM contrat WHERE id_contrat = ?";
+            pstmt = connection.prepareStatement(sql);
+            pstmt.setInt(1, id);
 
-            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setInt(1, id);
-                int rowsAffected = pstmt.executeUpdate();
+            int rowsAffected = pstmt.executeUpdate();
 
-                if (rowsAffected > 0) {
-                    conn.commit();
-                    return true;
-                } else {
-                    conn.rollback();
-                    return false;
-                }
+            if (rowsAffected > 0) {
+                // ✅ COMMIT : Transaction réussie
+                connection.commit();
+                return true;
+            } else {
+                connection.rollback();
+                return false;
             }
 
         } catch (SQLException e) {
-            try {
-                conn.rollback();
-                LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur de suppression", e);
-            } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+            // ✅ ROLLBACK en cas d'erreur SQL
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur SQL", e);
+                } catch (SQLException rollbackEx) {
+                    LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+                }
             }
 
             LOGGER.log(Level.SEVERE, "Erreur SQL lors de la suppression du contrat ID=" + id, e);
@@ -444,11 +558,25 @@ public class ContratDAO {
                     e
             );
         } finally {
-            try {
-                conn.setAutoCommit(true);
-            } catch (SQLException e) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", e);
+            // ✅ IMPORTANT : Fermer toutes les ressources et réactiver autoCommit
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
             }
+
+            // ✅ CRUCIAL : Réactiver autoCommit
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
+                }
+            }
+
+            // ❌ NE PAS fermer connection (Singleton)
         }
     }
 
@@ -459,13 +587,18 @@ public class ContratDAO {
      * pour maintenir l'intégrité référentielle. Elle est appelée dans le cadre
      * d'une transaction gérée par ClientDAO.
      *
+     * <p><strong>NOTE :</strong> Cette méthode n'est plus utilisée car
+     * ClientDAO.delete() vérifie qu'il n'y a pas de contrats avant de supprimer.
+     * Elle reste disponible pour usage futur si nécessaire.</p>
+     *
      * @param clientId l'identifiant du client
      * @return le nombre de contrats supprimés
      * @throws DAOException si une erreur survient lors de la suppression
+     * @deprecated Utilisez la vérification dans ClientDAO.delete() à la place
      */
+    @Deprecated
     public int deleteByClientId(Integer clientId) throws DAOException {
         if (clientId == null || clientId <= 0) {
-            LOGGER.log(Level.WARNING, "Tentative de deleteByClientId avec un ID invalide : {0}", clientId);
             throw new DAOException(
                     DAOException.ErrorCode.INVALID_PARAMETER,
                     "deleteByClientId",
@@ -474,14 +607,20 @@ public class ContratDAO {
             );
         }
 
-        String sql = "DELETE FROM contrat " +
-                "WHERE client_id = ?";
-        Connection conn = dbConnection.getConnection();
+        String sql = "DELETE FROM contrat WHERE client_id = ?";
 
-        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        PreparedStatement pstmt = null;
 
+        try {
+            // ✅ CORRECTION : Ne pas utiliser try-with-resources
+            // Cette méthode est appelée dans une transaction externe
+            Connection connection = dbConnection.getConnection();
+
+            pstmt = connection.prepareStatement(sql);
             pstmt.setInt(1, clientId);
+
             int rowsAffected = pstmt.executeUpdate();
+
             return rowsAffected;
 
         } catch (SQLException e) {
@@ -494,6 +633,17 @@ public class ContratDAO {
                     "Erreur lors de la suppression des contrats du client : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
+        } finally {
+            // ✅ IMPORTANT : Fermer SEULEMENT le PreparedStatement
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
+            }
+            // ❌ NE PAS fermer connection (Singleton)
+            // ❌ NE PAS gérer transaction (responsabilité de l'appelant)
         }
     }
 
