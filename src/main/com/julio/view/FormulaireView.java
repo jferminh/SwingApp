@@ -24,8 +24,8 @@ import static main.com.julio.service.LoggingService.LOGGER;
  * Adapte dynamiquement l'interface selon le type d'entité et l'action.
  *
  * @author Julio FERMIN
- * @version 1.0
- * @since 19/11/2025
+ * @version 1.1
+ * @since 21/01/2026
  */
 public class FormulaireView extends JFrame {
 
@@ -70,7 +70,6 @@ public class FormulaireView extends JFrame {
      * @param action action à effectuer ("Créer", "Modifier", "Supprimer")
      * @param origin vue d'origine ("accueil", "listeview")
      */
-
     public FormulaireView(ClientViewModel clientVM, ProspectViewModel prospectVM, ContratViewModel contratVM,
                           boolean isClient, Integer entityId, String action, String origin) {
         this.clientVM = clientVM;
@@ -83,16 +82,12 @@ public class FormulaireView extends JFrame {
 
         initialiserInterface();
 
-        // Charger données existantes si modification/suppression
+        // ✅ Charger données existantes si modification/suppression
         if (entityId != null) {
             chargerDonnees();
         }
     }
 
-//    public FormulaireView() throws DAOException {
-//        this.clientVM = new ClientViewModel();
-//        initialiserInterface();
-//    }
     /**
      * Initialise l'interface adaptée selon le type d'entité et l'action.
      * Construit dynamiquement les champs spécifiques.
@@ -211,21 +206,7 @@ public class FormulaireView extends JFrame {
             // Mode création/modification
             btnSauvegarder.setText("Sauvegarder");
             btnSauvegarder.setPreferredSize(new Dimension(100, 28));
-            btnSauvegarder.addActionListener(e -> {
-                try {
-                    sauvegarder();
-                } catch (ValidationException ve) {
-                    DisplayDialog.messageError("Erreur d'entrée", ve.getMessage());
-                } catch (NumberFormatException nfe) {
-                    DisplayDialog.messageError("Erreur d'entrée",
-                            "Erreur de format numérique. Vérifiez vos saisies.");
-                } catch (DateTimeException dte) {
-                    DisplayDialog.messageError("Erreur d'entrée",
-                            "La date n'a pas le format jj/MM/aaaa");
-                } catch (Exception ex) {
-                    DisplayDialog.messageError("Erreur", ex.getMessage());
-                }
-            });
+            btnSauvegarder.addActionListener(e -> sauvegarder());
         }
         buttonPanel.add(btnSauvegarder);
 
@@ -285,10 +266,34 @@ public class FormulaireView extends JFrame {
      * Ouvre la vue des contrats du client en cours de modification.
      */
     private void voirContrats() {
-        Client client = clientVM.getClientById(entityId);
-        ListeContratsView contratsView = new ListeContratsView(clientVM, prospectVM, contratVM, client, "formulaireview");
-        contratsView.setVisible(true);
-        this.dispose();
+        try {
+            // ✅ Gestion exception pour récupération client
+            Client client = clientVM.getClientById(entityId);
+
+            if (client == null) {
+                DisplayDialog.messageWarning("Client introuvable",
+                        "Le client n'existe plus dans la base de données.");
+                retour();
+                return;
+            }
+
+            ListeContratsView contratsView = new ListeContratsView(
+                    clientVM, prospectVM, contratVM, client, "formulaireview"
+            );
+            contratsView.setVisible(true);
+            this.dispose();
+
+        } catch (DAOException e) {
+            String message = switch (e.getErrorCode()) {
+                case CONNECTION_ERROR ->
+                        "Impossible de se connecter à la base de données.";
+                case READ_ERROR ->
+                        "Erreur lors de la récupération du client.";
+                default ->
+                        "Erreur : " + e.getMessage();
+            };
+            DisplayDialog.messageError("Erreur", message);
+        }
     }
 
     /**
@@ -315,9 +320,18 @@ public class FormulaireView extends JFrame {
      * Appelé en mode modification/suppression.
      */
     private void chargerDonnees() {
-        if (isClient) {
-            Client client = clientVM.getClientById(entityId);
-            if (client != null) {
+        try {
+            // ✅ Gestion exception pour chargement données
+            if (isClient) {
+                Client client = clientVM.getClientById(entityId);
+
+                if (client == null) {
+                    DisplayDialog.messageError("Client introuvable",
+                            "Le client n'existe plus dans la base de données.");
+                    retour();
+                    return;
+                }
+
                 // Remplir champs communs
                 txtId.setText(String.valueOf(client.getId()));
                 txtRaisonSociale.setText(client.getRaisonSociale());
@@ -331,10 +345,17 @@ public class FormulaireView extends JFrame {
                 // Remplir champs spécifiques Client
                 txtChiffreAffaires.setText(String.valueOf(client.getChiffreAffaires()));
                 txtNbEmployes.setText(String.valueOf(client.getNbEmployes()));
-            }
-        } else {
-            Prospect prospect = prospectVM.getProspectById(entityId);
-            if (prospect != null) {
+
+            } else {
+                Prospect prospect = prospectVM.getProspectById(entityId);
+
+                if (prospect == null) {
+                    DisplayDialog.messageError("Prospect introuvable",
+                            "Le prospect n'existe plus dans la base de données.");
+                    retour();
+                    return;
+                }
+
                 // Remplir champs communs
                 txtId.setText(String.valueOf(prospect.getId()));
                 txtRaisonSociale.setText(prospect.getRaisonSociale());
@@ -349,6 +370,19 @@ public class FormulaireView extends JFrame {
                 txtDateProspection.setText(prospect.getDateProspectionFormatee());
                 cmbInteresse.setSelectedItem(prospect.getInteresse());
             }
+
+        } catch (DAOException e) {
+            String type = isClient ? "client" : "prospect";
+            String message = switch (e.getErrorCode()) {
+                case CONNECTION_ERROR ->
+                        "Impossible de se connecter à la base de données.";
+                case READ_ERROR ->
+                        "Erreur lors de la lecture des données du " + type + ".";
+                default ->
+                        "Erreur lors du chargement du " + type + " : " + e.getMessage();
+            };
+            DisplayDialog.messageError("Erreur de Chargement", message);
+            retour();
         }
     }
 
@@ -359,79 +393,148 @@ public class FormulaireView extends JFrame {
         String raisonSociale = txtRaisonSociale.getText().trim();
         int confirm = JOptionPane.showConfirmDialog(this,
                 "Êtes-vous sûr de vouloir supprimer : " + raisonSociale + " ?",
-                "Confirmation", JOptionPane.YES_NO_OPTION);
+                "Confirmation", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
 
-        if (confirm == JOptionPane.YES_OPTION) {
-            // Dispatcher suppression selon type
+        if (confirm != JOptionPane.YES_OPTION) {
+            return;  // Annulation
+        }
+
+        try {
+            // ✅ Gestion exception pour suppression
             boolean success = isClient ?
                     clientVM.supprimerClient(entityId) :
                     prospectVM.supprimerProspect(entityId);
 
             if (success) {
                 DisplayDialog.messageInfo("Succès", "Suppression réussie");
+                retour();
             } else {
-                DisplayDialog.messageError("Erreur", "Erreur lors de la suppression");
+                DisplayDialog.messageWarning("Attention",
+                        "L'entité n'existe plus dans la base de données.");
+                retour();
             }
+
+        } catch (DAOException e) {
+            String type = isClient ? "client" : "prospect";
+            String message = switch (e.getErrorCode()) {
+                case FOREIGN_KEY_VIOLATION ->
+                        "Impossible de supprimer : ce " + type + " possède des contrats associés.\n" +
+                                "Veuillez d'abord supprimer ses contrats.";
+                case ENTITY_NOT_FOUND ->
+                        "L'entité n'existe plus dans la base de données.";
+                case CONNECTION_ERROR ->
+                        "Impossible de se connecter à la base de données.";
+                default ->
+                        "Erreur lors de la suppression : " + e.getMessage();
+            };
+            DisplayDialog.messageError("Erreur de Suppression", message);
         }
-        retour();
     }
 
     /**
      * Sauvegarde l'entité (création ou modification).
      * Valide et parse les données avant appel au ViewModel.
-     *
-     * @throws ValidationException si validation métier échoue
      */
-    private void sauvegarder() throws ValidationException {
-        // Récupération champs communs
-        String raisonSociale = txtRaisonSociale.getText().trim();
-        String numeroRue = txtNumeroRue.getText().trim();
-        String nomRue = txtNomRue.getText().trim();
-        String codePostal = txtCodePostal.getText().trim();
-        String ville = txtVille.getText().trim();
-        String telephone = txtTelephone.getText().trim();
-        String email = txtEmail.getText().trim();
-        String commentaires = txtCommentaires.getText().trim();
+    private void sauvegarder() {
+        try {
+            // Récupération champs communs
+            String raisonSociale = txtRaisonSociale.getText().trim();
+            String numeroRue = txtNumeroRue.getText().trim();
+            String nomRue = txtNomRue.getText().trim();
+            String codePostal = txtCodePostal.getText().trim();
+            String ville = txtVille.getText().trim();
+            String telephone = txtTelephone.getText().trim();
+            String email = txtEmail.getText().trim();
+            String commentaires = txtCommentaires.getText().trim();
 
-        if (isClient) {
-            // Parsing champs spécifiques Client
-            long chiffreAffaires = Long.parseLong(txtChiffreAffaires.getText().trim());
-            int nbEmployes = Integer.parseInt(txtNbEmployes.getText().trim());
+            if (isClient) {
+                // Parsing champs spécifiques Client
+                long chiffreAffaires = Long.parseLong(txtChiffreAffaires.getText().trim());
+                int nbEmployes = Integer.parseInt(txtNbEmployes.getText().trim());
 
-            if (entityId == null) {
-                // Mode création
-                clientVM.creerClient(raisonSociale, numeroRue, nomRue, codePostal,
-                        ville, telephone, email, commentaires,
-                        chiffreAffaires, nbEmployes);
-                DisplayDialog.messageInfo("Succès", "Client créé avec succès");
+                if (entityId == null) {
+                    // Mode création
+                    clientVM.creerClient(raisonSociale, numeroRue, nomRue, codePostal,
+                            ville, telephone, email, commentaires,
+                            chiffreAffaires, nbEmployes);
+                    DisplayDialog.messageInfo("Succès", "Client créé avec succès");
+                } else {
+                    // Mode modification
+                    boolean success = clientVM.modifierClient(entityId, raisonSociale, numeroRue, nomRue,
+                            codePostal, ville, telephone, email, commentaires,
+                            chiffreAffaires, nbEmployes);
+
+                    if (success) {
+                        DisplayDialog.messageInfo("Succès", "Client modifié avec succès");
+                    } else {
+                        DisplayDialog.messageWarning("Attention", "Aucune modification effectuée");
+                    }
+                }
             } else {
-                // Mode modification
-                clientVM.modifierClient(entityId, raisonSociale, numeroRue, nomRue,
-                        codePostal, ville, telephone, email, commentaires,
-                        chiffreAffaires, nbEmployes);
-                DisplayDialog.messageInfo("Succès", "Client modifié avec succès");
-            }
-        } else {
-            // Parsing champs spécifiques Prospect
-            LocalDate dateProspection = DateUtils.parseDate(txtDateProspection.getText().trim());
-            Interesse interesse = (Interesse) cmbInteresse.getSelectedItem();
+                // Parsing champs spécifiques Prospect
+                LocalDate dateProspection = DateUtils.parseDate(txtDateProspection.getText().trim());
+                Interesse interesse = (Interesse) cmbInteresse.getSelectedItem();
 
-            if (entityId == null) {
-                // Mode création
-                prospectVM.creerProspect(raisonSociale, numeroRue, nomRue, codePostal,
-                        ville, telephone, email, commentaires,
-                        dateProspection, interesse);
-                DisplayDialog.messageInfo("Succès", "Prospect créé avec succès!");
-            } else {
-                // Mode modification
-                prospectVM.modifierProspect(entityId, raisonSociale, numeroRue, nomRue,
-                        codePostal, ville, telephone, email, commentaires,
-                        dateProspection, interesse);
-                DisplayDialog.messageInfo("Succès", "Prospect modifié avec succès!");
+                if (entityId == null) {
+                    // Mode création
+                    prospectVM.creerProspect(raisonSociale, numeroRue, nomRue, codePostal,
+                            ville, telephone, email, commentaires,
+                            dateProspection, interesse);
+                    DisplayDialog.messageInfo("Succès", "Prospect créé avec succès!");
+                } else {
+                    // Mode modification
+                    boolean success = prospectVM.modifierProspect(entityId, raisonSociale, numeroRue, nomRue,
+                            codePostal, ville, telephone, email, commentaires,
+                            dateProspection, interesse);
+
+                    if (success) {
+                        DisplayDialog.messageInfo("Succès", "Prospect modifié avec succès!");
+                    } else {
+                        DisplayDialog.messageWarning("Attention", "Aucune modification effectuée");
+                    }
+                }
             }
+
+            retour();
+
+        } catch (ValidationException e) {
+            // ✅ Erreur de validation métier
+            DisplayDialog.messageWarning("Erreur de Validation", e.getMessage());
+
+        } catch (NumberFormatException e) {
+            // ✅ Erreur format numérique
+            DisplayDialog.messageError("Erreur de Format",
+                    "Erreur de format numérique.\n" +
+                            "Vérifiez le chiffre d'affaires et le nombre d'employés.");
+
+        } catch (DateTimeException e) {
+            // ✅ Erreur format date
+            DisplayDialog.messageError("Erreur de Date",
+                    "La date doit être au format jj/MM/aaaa\n" +
+                            "Exemple : 21/01/2026");
+
+        } catch (DAOException e) {
+            // ✅ Erreur DAO (connexion, contraintes, etc.)
+            String operation = (entityId == null) ? "création" : "modification";
+            String message = switch (e.getErrorCode()) {
+                case UNIQUE_CONSTRAINT_VIOLATION ->
+                        "Cette raison sociale existe déjà dans la base de données.";
+                case FOREIGN_KEY_VIOLATION ->
+                        "Erreur de référence dans la base de données.";
+                case CONNECTION_ERROR ->
+                        "Impossible de se connecter à la base de données.";
+                case ENTITY_NOT_FOUND ->
+                        "L'entité n'existe plus dans la base de données.";
+                default ->
+                        "Erreur lors de la " + operation + " : " + e.getMessage();
+            };
+            DisplayDialog.messageError("Erreur", message);
+
+        } catch (Exception e) {
+            // ✅ Erreur inattendue
+            DisplayDialog.messageError("Erreur Inattendue",
+                    "Une erreur inattendue s'est produite :\n" + e.getMessage());
         }
-
-        retour();
     }
 
     /**
