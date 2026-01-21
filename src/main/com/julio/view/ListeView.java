@@ -1,5 +1,6 @@
 package main.com.julio.view;
 
+import main.com.julio.exception.DAOException;
 import main.com.julio.model.Client;
 import main.com.julio.util.DisplayDialog;
 import main.com.julio.viewmodel.ClientViewModel;
@@ -20,8 +21,8 @@ import static main.com.julio.service.LoggingService.LOGGER;
  * Permet la sélection et navigation vers les opérations CRUD.
  *
  * @author Julio FERMIN
- * @version 1.0
- * @since 19/11/2025
+ * @version 1.1
+ * @since 21/01/2026
  */
 public class ListeView extends JFrame {
 
@@ -72,13 +73,13 @@ public class ListeView extends JFrame {
 
         // En-tête avec titre dynamique
         JPanel headerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JLabel titre = new JLabel("Liste des " + type);
+        JLabel titre = new JLabel("Liste des " + type + "s");
         titre.setFont(new Font("Arial", Font.BOLD, 20));
         headerPanel.add(titre);
         mainPanel.add(headerPanel, BorderLayout.NORTH);
 
-        // Table avec modèle chargé depuis ViewModel
-        tableModel = isClient ? clientVM.construireTableModel() : prospectVM.construireTableModel();
+        // ✅ Initialiser table avec modèle vide (sera remplie dans chargerDonnees)
+        creerTableVide();
         table = new JTable(tableModel);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);  // Une ligne à la fois
         table.setFont(new Font("Arial", Font.PLAIN, 12));
@@ -132,12 +133,60 @@ public class ListeView extends JFrame {
     }
 
     /**
+     * Crée une table vide avec les colonnes appropriées.
+     * Utilisé en cas d'erreur de chargement ou à l'initialisation.
+     */
+    private void creerTableVide() {
+        String[] colonnes;
+
+        if (isClient) {
+            colonnes = new String[]{"ID", "Raison Sociale", "Adresse", "Téléphone",
+                    "Email", "CA (€)", "Nb Employés", "Nb Contrats"};
+        } else {
+            colonnes = new String[]{"ID", "Raison Sociale", "Adresse", "Téléphone",
+                    "Email", "Date Prospection", "Intéressé"};
+        }
+
+        tableModel = new DefaultTableModel(colonnes, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;  // Table en lecture seule
+            }
+        };
+    }
+
+    /**
      * Recharge les données de la table depuis le ViewModel.
+     * Gère les erreurs en affichant un message et en créant une table vide.
      */
     private void chargerDonnees() {
-        // Dispatcher selon type d'entité
-        tableModel = isClient ? clientVM.construireTableModel() : prospectVM.construireTableModel();
-        table.setModel(tableModel);
+        try {
+            // ✅ Appel avec gestion d'exception
+            tableModel = isClient
+                    ? clientVM.construireTableModel()
+                    : prospectVM.construireTableModel();
+
+            table.setModel(tableModel);
+
+        } catch (DAOException e) {
+            // ✅ Message d'erreur adapté selon le type d'erreur
+            String type = isClient ? "clients" : "prospects";
+            String message = switch (e.getErrorCode()) {
+                case CONNECTION_ERROR ->
+                        "Impossible de se connecter à la base de données.\n" +
+                                "Vérifiez que le serveur MySQL est démarré.";
+                case READ_ERROR ->
+                        "Erreur lors de la lecture des " + type + ".";
+                default ->
+                        "Erreur lors du chargement des " + type + " :\n" + e.getMessage();
+            };
+
+            DisplayDialog.messageError("Erreur de Chargement", message);
+
+            // ✅ Créer une table vide pour éviter NullPointerException
+            creerTableVide();
+            table.setModel(tableModel);
+        }
     }
 
     /**
@@ -151,7 +200,7 @@ public class ListeView extends JFrame {
         form.setVisible(true);
         this.dispose();
 
-        // WindowListener pour recharger données au retour (si nécessaire)
+        // WindowListener pour recharger données au retour
         form.addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosed(WindowEvent windowEvent) {
@@ -205,13 +254,35 @@ public class ListeView extends JFrame {
             return;
         }
 
-        // Récupérer le client complet depuis le ViewModel
-        int clientId = (int) table.getValueAt(selectedRow, 0);
-        Client client = clientVM.getClientById(clientId);
+        try {
+            // ✅ Récupérer le client complet depuis le ViewModel avec gestion d'exception
+            int clientId = (int) table.getValueAt(selectedRow, 0);
+            Client client = clientVM.getClientById(clientId);
 
-        ListeContratsView contratsView = new ListeContratsView(clientVM, prospectVM, contratVM, client, "listeview");
-        contratsView.setVisible(true);
-        this.dispose();
+            if (client == null) {
+                DisplayDialog.messageWarning("Client introuvable",
+                        "Le client sélectionné n'existe plus.");
+                chargerDonnees();  // Rafraîchir la liste
+                return;
+            }
+
+            ListeContratsView contratsView = new ListeContratsView(clientVM, prospectVM, contratVM, client, "listeview");
+            contratsView.setVisible(true);
+            this.dispose();
+
+        } catch (DAOException e) {
+            // ✅ Gestion erreur récupération client
+            String message = switch (e.getErrorCode()) {
+                case CONNECTION_ERROR ->
+                        "Impossible de se connecter à la base de données.";
+                case READ_ERROR ->
+                        "Erreur lors de la récupération du client.";
+                default ->
+                        "Erreur : " + e.getMessage();
+            };
+
+            DisplayDialog.messageError("Erreur", message);
+        }
     }
 
     /**
