@@ -13,6 +13,8 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static main.com.julio.util.JdbcUtil.closeResources;
+
 /**
  * Classe DAO pour la gestion des clients en base de données.
  * Implémente le pattern Data Access Object (DAO) pour l'entité Client.
@@ -127,18 +129,8 @@ public class ClientDAO extends SocieteDAO {
                     e
             );
         } finally {
-            // ✅ IMPORTANT : Fermer SEULEMENT ResultSet et PreparedStatement
-            // NE PAS FERMER la connexion (gérée par Singleton)
-            if (rs != null) {
-                try { rs.close(); } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
-                }
-            }
-            if (pstmt != null) {
-                try { pstmt.close(); } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
+            closeResources(rs, pstmt, null);
+
         }
     }
 
@@ -252,22 +244,7 @@ public class ClientDAO extends SocieteDAO {
                     e
             );
         } finally {
-            // ✅ IMPORTANT : Fermer SEULEMENT ResultSet et PreparedStatement
-            // NE PAS FERMER la connexion (gérée par Singleton)
-            if (rs != null) {
-                try {
-                    rs.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur lors de la fermeture du ResultSet", e);
-                }
-            }
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur lors de la fermeture du PreparedStatement", e);
-                }
-            }
+            closeResources(rs, pstmt, null);
         }
     }
 
@@ -374,53 +351,11 @@ public class ClientDAO extends SocieteDAO {
             throw e;
 
         } finally {
-            // ✅ IMPORTANT : Fermer les ressources et réactiver autoCommit
-            // NE PAS FERMER la connexion (Singleton)
+            closeResources(generatedKeys, pstmt, connection);
 
-            if (generatedKeys != null) {
-                try {
-                    generatedKeys.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet generatedKeys", e);
-                }
-            }
-
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
-
-            // ✅ CRUCIAL : Réactiver autoCommit pour les prochaines opérations
-            if (connection != null) {
-                try {
-                    connection.setAutoCommit(true);
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
-                }
-            }
-
-            //  NE PAS FERMER connection (gérée par Singleton)
         }
     }
 
-
-    /**
-     * Met à jour un client existant dans la base de données.
-     *
-     * <p>Cette méthode effectue une transaction qui met à jour :</p>
-     * <ul>
-     *   <li>L'adresse (si elle existe et a un ID)</li>
-     *   <li>La société</li>
-     *   <li>Le client</li>
-     * </ul>
-     *
-     * @param client le client à mettre à jour (doit avoir un ID valide)
-     * @return true si la mise à jour a réussi, false si le client n'existe pas
-     * @throws DAOException si une erreur survient lors de la mise à jour
-     */
     public boolean save(Client client) throws DAOException {
         if (client == null || client.getId() == null || client.getId() <= 0) {
             throw new DAOException(
@@ -437,7 +372,6 @@ public class ClientDAO extends SocieteDAO {
         ResultSet rs = null;
 
         try {
-            // ✅ CORRECTION : Récupérer la connexion sans try-with-resources
             connection = dbConnexion.getConnection();
             connection.setAutoCommit(false);
 
@@ -456,10 +390,9 @@ public class ClientDAO extends SocieteDAO {
                 return false;
             }
 
-            // Fermer le ResultSet et PreparedStatement
-            rs.close();
+            // On peut fermer ici ce couple rs / pstmtGetSociete
+            closeResources(rs, pstmtGetSociete, null);
             rs = null;
-            pstmtGetSociete.close();
             pstmtGetSociete = null;
 
             // ========== ÉTAPE 2 : Mettre à jour l'adresse ==========
@@ -483,7 +416,6 @@ public class ClientDAO extends SocieteDAO {
             int rowsAffected = pstmtUpdateClient.executeUpdate();
 
             if (rowsAffected > 0) {
-                // ✅ COMMIT : Transaction réussie
                 connection.commit();
 
                 LOGGER.log(Level.INFO,
@@ -499,7 +431,6 @@ public class ClientDAO extends SocieteDAO {
             }
 
         } catch (SQLException e) {
-            // ✅ ROLLBACK en cas d'erreur SQL
             if (connection != null) {
                 try {
                     connection.rollback();
@@ -519,7 +450,6 @@ public class ClientDAO extends SocieteDAO {
             );
 
         } catch (DAOException e) {
-            // ✅ ROLLBACK en cas d'erreur DAO
             if (connection != null) {
                 try {
                     connection.rollback();
@@ -531,43 +461,17 @@ public class ClientDAO extends SocieteDAO {
             throw e;
 
         } finally {
-            // ✅ IMPORTANT : Fermer toutes les ressources
-            if (rs != null) {
-                try {
-                    rs.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
-                }
+            if (pstmtGetSociete != null && pstmtUpdateClient == null) {
+                closeResources(rs, pstmtGetSociete, connection);
+            } else if (pstmtUpdateClient != null) {
+                closeResources(null, pstmtUpdateClient, connection);
+            } else {
+                closeResources(rs, null, connection);
             }
 
-            if (pstmtGetSociete != null) {
-                try {
-                    pstmtGetSociete.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement getSociete", e);
-                }
-            }
-
-            if (pstmtUpdateClient != null) {
-                try {
-                    pstmtUpdateClient.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement updateClient", e);
-                }
-            }
-
-            // ✅ CRUCIAL : Réactiver autoCommit
-            if (connection != null) {
-                try {
-                    connection.setAutoCommit(true);
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
-                }
-            }
-
-            // ❌ NE PAS FERMER connection (Singleton)
         }
     }
+
 
     /**
      * Supprime un client de la base de données.
@@ -746,32 +650,8 @@ public class ClientDAO extends SocieteDAO {
 
         } finally {
             // ✅ IMPORTANT : Fermer toutes les ressources
-            if (rs != null) {
-                try {
-                    rs.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
-                }
-            }
+            closeResources(rs, pstmt, connection);
 
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
-
-            // ✅ CRUCIAL : Réactiver autoCommit
-            if (connection != null) {
-                try {
-                    connection.setAutoCommit(true);
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
-                }
-            }
-
-            // ❌ NE PAS FERMER connection (Singleton)
         }
     }
 
@@ -802,43 +682,6 @@ public class ClientDAO extends SocieteDAO {
         }
 
         return 0;
-    }
-
-    /**
-     * Supprime une société dans la transaction en cours.
-     *
-     * @param connection la connexion à utiliser (transaction en cours)
-     * @param societeId l'ID de la société à supprimer
-     * @throws SQLException si une erreur survient
-     * @throws DAOException si la société n'existe pas
-     */
-    private void deleteSocieteInTransaction(Connection connection, Integer societeId)
-            throws SQLException, DAOException {
-
-        if (societeId == null || societeId <= 0) {
-            throw new DAOException(
-                    DAOException.ErrorCode.INVALID_PARAMETER,
-                    "deleteSocieteInTransaction",
-                    societeId,
-                    "L'ID de la société est invalide"
-            );
-        }
-
-        String sql = "DELETE FROM societe WHERE id_societe = ?";
-
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setInt(1, societeId);
-            int rowsAffected = pstmt.executeUpdate();
-
-            if (rowsAffected == 0) {
-                throw new DAOException(
-                        DAOException.ErrorCode.ENTITY_NOT_FOUND,
-                        "deleteSocieteInTransaction",
-                        societeId,
-                        "Aucune société trouvée avec l'ID " + societeId
-                );
-            }
-        }
     }
 
     /**
@@ -874,74 +717,6 @@ public class ClientDAO extends SocieteDAO {
 
         return false;
     }
-
-    /**
-     * Supprime une adresse dans la transaction en cours.
-     *
-     * @param connection la connexion à utiliser (transaction en cours)
-     * @param adresseId l'ID de l'adresse à supprimer
-     * @throws SQLException si une erreur survient
-     * @throws DAOException si l'adresse n'existe pas ou est encore référencée
-     */
-    private void deleteAdresseInTransaction(Connection connection, Integer adresseId)
-            throws SQLException, DAOException {
-
-        if (adresseId == null || adresseId <= 0) {
-            throw new DAOException(
-                    DAOException.ErrorCode.INVALID_PARAMETER,
-                    "deleteAdresseInTransaction",
-                    adresseId,
-                    "L'ID de l'adresse est invalide"
-            );
-        }
-
-        String sql = "DELETE FROM adresse WHERE id_adresse = ?";
-
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setInt(1, adresseId);
-            int rowsAffected = pstmt.executeUpdate();
-
-            if (rowsAffected == 0) {
-                LOGGER.log(Level.WARNING, "Aucune adresse trouvée avec l''ID {0}", adresseId);
-            }
-        }
-    }
-
-    /**
-     * Effectue un rollback sur une connexion.
-     *
-     * @param connection la connexion sur laquelle effectuer le rollback
-     * @param operation le nom de l'opération en cours (pour les logs)
-     * @param entityId l'ID de l'entité concernée (pour les logs)
-     */
-    private void rollback(Connection connection, String operation, Integer entityId) {
-        if (connection != null) {
-            try {
-                connection.rollback();
-                LOGGER.log(Level.WARNING,
-                        "Rollback effectué pour l''opération {0} sur l''entité ID={1}",
-                        new Object[]{operation, entityId});
-            } catch (SQLException e) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", e);
-            }
-        }
-    }
-
-    /**
-     * Réactive l'auto-commit sur une connexion.
-     *
-     * @param connection la connexion sur laquelle réactiver l'auto-commit
-     */
-    private void resetAutoCommit(Connection connection) {
-        if (connection != null) {
-            try {
-                connection.setAutoCommit(true);
-            } catch (SQLException e) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l''autoCommit", e);
-            }
-        }
-    }
-
 
     /**
      * Méthode utilitaire pour mapper un ResultSet vers un objet Client.

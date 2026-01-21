@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static main.com.julio.util.JdbcUtil.closeResources;
+
 /**
  * Classe DAO pour la gestion des prospects en base de données.
  * Implémente le pattern Data Access Object (DAO) pour l'entité Prospect.
@@ -99,20 +101,7 @@ public class ProspectDAO extends SocieteDAO {
                     e
             );
         } finally {
-            if (rs != null) {
-                try {
-                    rs.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
-                }
-            }
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
+            closeResources(rs, pstmt, null);
         }
     }
 
@@ -185,20 +174,7 @@ public class ProspectDAO extends SocieteDAO {
         } finally {
             // ✅ IMPORTANT : Fermer SEULEMENT ResultSet et PreparedStatement
             // NE PAS FERMER la connexion (gérée par Singleton)
-            if (rs != null) {
-                try {
-                    rs.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur lors de la fermeture du ResultSet", e);
-                }
-            }
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur lors de la fermeture du PreparedStatement", e);
-                }
-            }
+            closeResources(rs, pstmt, null);
         }
     }
 
@@ -311,30 +287,7 @@ public class ProspectDAO extends SocieteDAO {
             // ✅ IMPORTANT : Fermer les ressources et réactiver autoCommit
             // NE PAS FERMER la connexion (Singleton)
 
-            if (generatedKeys != null) {
-                try {
-                    generatedKeys.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet generatedKeys", e);
-                }
-            }
-
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
-
-            // ✅ CRUCIAL : Réactiver autoCommit pour les prochaines opérations
-            if (connection != null) {
-                try {
-                    connection.setAutoCommit(true);
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
-                }
-            }
+            closeResources(generatedKeys, pstmt, connection);
 
             // ❌ NE PAS FERMER connection (gérée par Singleton)
         }
@@ -458,37 +411,12 @@ public class ProspectDAO extends SocieteDAO {
 
         } finally {
             // ✅ IMPORTANT : Fermer toutes les ressources
-            if (rs != null) {
-                try {
-                    rs.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
-                }
-            }
-
-            if (pstmtGetSociete != null) {
-                try {
-                    pstmtGetSociete.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement getSociete", e);
-                }
-            }
-
-            if (pstmtUpdateProspect != null) {
-                try {
-                    pstmtUpdateProspect.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement updateProspect", e);
-                }
-            }
-
-            // ✅ CRUCIAL : Réactiver autoCommit
-            if (connection != null) {
-                try {
-                    connection.setAutoCommit(true);
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
-                }
+            if (pstmtGetSociete != null && pstmtUpdateProspect == null) {
+                closeResources(rs, pstmtGetSociete, connection);
+            } else if (pstmtUpdateProspect != null) {
+                closeResources(null, pstmtUpdateProspect, connection);
+            } else {
+                closeResources(rs, null, connection);
             }
 
             // ❌ NE PAS FERMER connection (Singleton)
@@ -670,30 +598,7 @@ public class ProspectDAO extends SocieteDAO {
 
         } finally {
             // ✅ IMPORTANT : Fermer toutes les ressources
-            if (rs != null) {
-                try {
-                    rs.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
-                }
-            }
-
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
-
-            // ✅ CRUCIAL : Réactiver autoCommit
-            if (connection != null) {
-                try {
-                    connection.setAutoCommit(true);
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
-                }
-            }
+            closeResources(rs, pstmt, connection);
 
             // ❌ NE PAS FERMER connection (Singleton)
         }

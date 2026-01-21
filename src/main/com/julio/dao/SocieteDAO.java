@@ -13,6 +13,8 @@ import java.sql.SQLException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static main.com.julio.util.JdbcUtil.closeResources;
+
 /**
  * Classe DAO pour la gestion de la table société.
  * Gère les informations communes aux clients et prospects.
@@ -157,21 +159,7 @@ public abstract class SocieteDAO {
             // ._ Faire commit/rollback (géré par l'appelant)
             // ._ Modifier autoCommit (géré par l'appelant)
 
-            if (generatedKeys != null) {
-                try {
-                    generatedKeys.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet generatedKeys", e);
-                }
-            }
-
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
+            closeResources(generatedKeys, pstmt, null);
 
             // NE PAS fermer connection
             // NE PAS toucher à setAutoCommit
@@ -278,13 +266,7 @@ public abstract class SocieteDAO {
             // ._ Faire commit/rollback (géré par l'appelant)
             // ._ Modifier autoCommit (géré par l'appelant)
 
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
+            closeResources(null, pstmt, null);
         }
     }
 
@@ -362,13 +344,7 @@ public abstract class SocieteDAO {
                     e
             );
         } finally {
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
+            closeResources(null, pstmt,  null);
         }
     }
 

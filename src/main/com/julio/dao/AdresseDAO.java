@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static main.com.julio.util.JdbcUtil.closeResources;
+
 /**
  * Classe DAO pour la gestion des adresses en base de données.
  * Implémente le pattern Data Access Object (DAO) pour l'entité Adresse.
@@ -208,17 +210,7 @@ public class AdresseDAO {
                     e
             );
         } finally {
-            // ✅ Fermer seulement rs et pstmt
-            if (generatedKeys != null) {
-                try { generatedKeys.close(); }
-                catch (SQLException e) { LOGGER.log(Level.WARNING, "Erreur fermeture RS", e); }
-            }
-            if (pstmt != null) {
-                try { pstmt.close(); }
-                catch (SQLException e) { LOGGER.log(Level.WARNING, "Erreur fermeture pstmt", e); }
-            }
-            //  NE PAS fermer connection
-            //  NE PAS gérer transaction
+            closeResources(generatedKeys, pstmt, null);
         }
     }
 
@@ -313,13 +305,7 @@ public class AdresseDAO {
             // - Faire commit/rollback (géré par l'appelant)
             // - Modifier autoCommit (géré par l'appelant)
 
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
+            closeResources(null, pstmt, null);
         }
     }
 
@@ -398,13 +384,7 @@ public class AdresseDAO {
             );
         } finally {
             // ✅ IMPORTANT : Fermer SEULEMENT le PreparedStatement
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
+            closeResources(null, pstmt, null);
             // ❌ NE PAS fermer connection (Singleton)
             // ❌ NE PAS gérer transaction (responsabilité de l'appelant)
         }

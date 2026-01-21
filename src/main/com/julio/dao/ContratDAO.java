@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static main.com.julio.util.JdbcUtil.closeResources;
+
 /**
  * Classe DAO pour la gestion des contrats en base de données.
  * Implémente le pattern Data Access Object (DAO) pour l'entité Contrat.
@@ -101,20 +103,7 @@ public class ContratDAO {
             );
         } finally {
             // ✅ IMPORTANT : Fermer SEULEMENT ResultSet et Statement
-            if (rs != null) {
-                try {
-                    rs.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
-                }
-            }
-            if (stmt != null) {
-                try {
-                    stmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture Statement", e);
-                }
-            }
+            closeResources(rs, stmt, null);
             // ❌ NE PAS fermer connection (Singleton)
         }
     }
@@ -183,20 +172,7 @@ public class ContratDAO {
             );
         } finally {
             // ✅ IMPORTANT : Fermer SEULEMENT ResultSet et PreparedStatement
-            if (rs != null) {
-                try {
-                    rs.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
-                }
-            }
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
+            closeResources(rs, pstmt, null);
             // ❌ NE PAS fermer connection (Singleton)
         }
     }
@@ -264,20 +240,7 @@ public class ContratDAO {
             );
         } finally {
             // ✅ IMPORTANT : Fermer SEULEMENT ResultSet et PreparedStatement
-            if (rs != null) {
-                try {
-                    rs.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
-                }
-            }
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
+            closeResources(rs, pstmt, null);
             // ❌ NE PAS fermer connection (Singleton)
         }
     }
@@ -375,32 +338,7 @@ public class ContratDAO {
             );
         } finally {
             // ✅ IMPORTANT : Fermer toutes les ressources et réactiver autoCommit
-            if (generatedKeys != null) {
-                try {
-                    generatedKeys.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet generatedKeys", e);
-                }
-            }
-
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
-
-            // ✅ CRUCIAL : Réactiver autoCommit
-            if (connection != null) {
-                try {
-                    connection.setAutoCommit(true);
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
-                }
-            }
-
-            // ❌ NE PAS fermer connection (Singleton)
+           closeResources(generatedKeys, pstmt, connection);
         }
     }
 
@@ -474,22 +412,7 @@ public class ContratDAO {
             );
         } finally {
             // ✅ IMPORTANT : Fermer toutes les ressources et réactiver autoCommit
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
-
-            // ✅ CRUCIAL : Réactiver autoCommit
-            if (connection != null) {
-                try {
-                    connection.setAutoCommit(true);
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
-                }
-            }
+            closeResources(null, pstmt, connection);
 
             // ❌ NE PAS fermer connection (Singleton)
         }
@@ -559,22 +482,7 @@ public class ContratDAO {
             );
         } finally {
             // ✅ IMPORTANT : Fermer toutes les ressources et réactiver autoCommit
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
-
-            // ✅ CRUCIAL : Réactiver autoCommit
-            if (connection != null) {
-                try {
-                    connection.setAutoCommit(true);
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
-                }
-            }
+            closeResources(null, pstmt, connection);
 
             // ❌ NE PAS fermer connection (Singleton)
         }
@@ -635,13 +543,7 @@ public class ContratDAO {
             );
         } finally {
             // ✅ IMPORTANT : Fermer SEULEMENT le PreparedStatement
-            if (pstmt != null) {
-                try {
-                    pstmt.close();
-                } catch (SQLException e) {
-                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
-                }
-            }
+            closeResources(null, pstmt, null);
             // ❌ NE PAS fermer connection (Singleton)
             // ❌ NE PAS gérer transaction (responsabilité de l'appelant)
         }
