@@ -13,6 +13,7 @@ import main.com.julio.repository.ContratRepository;
 import main.com.julio.service.LoggerService;
 import main.com.julio.service.UnicityService;
 
+import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.util.List;
 import java.util.logging.Level;
@@ -244,35 +245,29 @@ public class ClientViewModel {
      */
     public boolean supprimerClient(Integer id) {
         try {
-            boolean success = clientDAO.delete(id);
-
-            if (success) {
-                LOGGER.log(Level.INFO, "Client supprimé avec succès : ID={0}", id);
-            } else {
-                LOGGER.log(Level.WARNING, "Aucun client trouvé avec l'ID {0} pour suppression", id);
-            }
-
-            return success;
+            return clientDAO.delete(id);
 
         } catch (DAOException e) {
-            LOGGER.log(Level.SEVERE, "Erreur lors de la suppression du client ID=" + id, e);
+            if (e.getErrorCode() == DAOException.ErrorCode.FOREIGN_KEY_VIOLATION) {
+                // Message spécifique pour l'utilisateur
+                JOptionPane.showMessageDialog(
+                        null,
+                        "Impossible de supprimer ce client car il possède des contrats.\n" +
+                                "Veuillez d'abord supprimer ou réaffecter ses contrats.",
+                        "Suppression refusée",
+                        JOptionPane.WARNING_MESSAGE
+                );
+            } else {
+                // Erreur technique générique
+                JOptionPane.showMessageDialog(
+                        null,
+                        "Erreur lors de la suppression : " + e.getMessage(),
+                        "Erreur",
+                        JOptionPane.ERROR_MESSAGE
+                );
+            }
 
-            String messageUtilisateur = switch (e.getErrorCode()) {
-                case FOREIGN_KEY_VIOLATION -> {
-                    // Extraire le nombre de contrats du message d'erreur
-                    String msg = e.getMessage();
-                    if (msg.contains("contrat(s)")) {
-                        yield msg; // Message déjà formaté par ClientDAO
-                    }
-                    yield "Impossible de supprimer le client : des contrats sont associés.";
-                }
-                case ENTITY_NOT_FOUND ->
-                        "Client introuvable.";
-                default ->
-                        "Erreur lors de la suppression : " + e.getMessage();
-            };
-
-            throw new RuntimeException(messageUtilisateur, e);
+            return false;
         }
     }
 
