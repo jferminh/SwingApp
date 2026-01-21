@@ -271,22 +271,18 @@ public class ClientDAO extends SocieteDAO {
         }
     }
 
-
     /**
-     * Insère un nouveau client dans la base de données avec transaction.
-     * <p>
-     * Processus :
-     * 1. Démarre une transaction
-     * 2. Insère la partie société (table societe) via SocieteDAO
-     * 3. Insère la partie client (table client)
-     * 4. Commit de la transaction
-     * <p>
-     * Note : Les contrats ne sont pas insérés automatiquement, ils doivent
-     * être créés séparément via ContratDAO après la création du client.
+     * Crée un nouveau client dans la base de données.
      *
-     * @param client le client à insérer
-     * @return le client avec son ID généré
-     * @throws DAOException si une erreur survient lors de l'insertion
+     * <p>Cette méthode effectue une transaction qui :</p>
+     * <ul>
+     *   <li>Insère d'abord la société (via createSociete)</li>
+     *   <li>Puis insère le client avec l'ID société généré</li>
+     * </ul>
+     *
+     * @param client le client à créer (ne doit pas être null)
+     * @return le client créé avec son ID généré
+     * @throws DAOException si une erreur survient lors de la création
      */
     public Client create(Client client) throws DAOException {
         if (client == null) {
@@ -298,83 +294,118 @@ public class ClientDAO extends SocieteDAO {
             );
         }
 
-        Connection connection = dbConnexion.getConnection();
+        Connection connection = null;
+        PreparedStatement pstmt = null;
+        ResultSet generatedKeys = null;
 
         try {
+            // ✅ CORRECTION : Récupérer la connexion sans try-with-resources
+            connection = dbConnexion.getConnection();
             connection.setAutoCommit(false);
 
-            // 1. Insérer la partie société
+            // ========== ÉTAPE 1 : Insérer la partie société ==========
             Integer societeId = createSociete(client);
 
-            // 2. Insérer la partie client
-            String query = "INSERT INTO client (" +
-                    "id_societe, " +
-                    "chiffre_affaires, " +
-                    "nb_employes) " +
-                    " VALUES (?, ?, ?)";
+            // ========== ÉTAPE 2 : Insérer la partie client ==========
+            String sql = "INSERT INTO client (id_societe, chiffre_affaires, nb_employes) " +
+                    "VALUES (?, ?, ?)";
 
-            try (PreparedStatement statement = connection.prepareStatement(query,
-                    Statement.RETURN_GENERATED_KEYS)) {
-                statement.setInt(1, societeId);
-                statement.setLong(2, client.getChiffreAffaires());
-                statement.setInt(3, client.getNbEmployes());
+            pstmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            pstmt.setInt(1, societeId);
+            pstmt.setLong(2, client.getChiffreAffaires());
+            pstmt.setInt(3, client.getNbEmployes());
 
-                int rowsAffected = statement.executeUpdate();
+            int rowsAffected = pstmt.executeUpdate();
 
-                if (rowsAffected == 0) {
-                    throw new SQLException("L'insértion du client a échoué, aucune ligne affectée");
-                }
+            if (rowsAffected == 0) {
+                throw new SQLException("L'insertion du client a échoué, aucune ligne affectée");
+            }
 
-                // Récupérer l'ID généré pour le client
-                try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        Integer clientId = generatedKeys.getInt(1);
-                        client.setId(clientId); // ID de la table client
+            // ========== ÉTAPE 3 : Récupérer l'ID généré ==========
+            generatedKeys = pstmt.getGeneratedKeys();
 
-                        // Charger les contrats du client (vide pour un nouveau client)
-                        List<Contrat> contrats = contratDAO.findByIdClient(clientId);
-                        for (Contrat contrat : contrats) {
-                            client.ajouterContrat(contrat);
-                        }
+            if (generatedKeys.next()) {
+                Integer clientId = generatedKeys.getInt(1);
+                client.setId(clientId);  // ID de la table client
 
-                        connection.commit();
-                        LOGGER.log(Level.INFO,
-                                "Client créé avec succès : ID client={0}, ID société={1}, Raison sociale={2}, CA={3}, Nb employés={4}",
-                                new Object[]{clientId, societeId, client.getRaisonSociale(),
-                                        client.getChiffreAffaires(), client.getNbEmployes()});
-                    } else {
-                        throw new SQLException("L'insertion a échoué, aucun ID généré");
-                    }
+                // ✅ OPTIMISATION : Pas besoin de charger les contrats
+                // Un client nouvellement créé n'a jamais de contrats
+                // La liste est déjà vide par défaut dans le constructeur
 
-                }
+                // ✅ COMMIT : Transaction réussie
+                connection.commit();
+
                 return client;
-            }
-        } catch (SQLException e) {
-            try {
-                connection.rollback();
-                LOGGER.log(Level.SEVERE, "Erreur lors de la création de client, rollback effectué", e);
 
-            } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+            } else {
+                throw new SQLException("L'insertion a échoué, aucun ID généré");
             }
-//            String detailedMessage = analyzeSQLException(e);
-            LOGGER.log(Level.SEVERE, "Erreur lors de la création du client : ");
+
+        } catch (SQLException e) {
+            // ✅ ROLLBACK en cas d'erreur SQL
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur SQL", e);
+                } catch (SQLException rollbackEx) {
+                    LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+                }
+            }
+
+            LOGGER.log(Level.SEVERE, "Erreur SQL lors de la création du client", e);
             throw new DAOException(
                     SQLExceptionAnalyzer.categorize(e),
                     "create",
                     client.getId(),
-                    "Erreur : " + SQLExceptionAnalyzer.analyze(e),
+                    "Erreur lors de la création du client : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
-        } finally {
-            try {
-                connection.setAutoCommit(true);
 
-            } catch (SQLException e) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", e);
+        } catch (DAOException e) {
+            // ✅ ROLLBACK en cas d'erreur DAO (createSociete peut lever DAOException)
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur DAO", e);
+                } catch (SQLException rollbackEx) {
+                    LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+                }
             }
+            throw e;
+
+        } finally {
+            // ✅ IMPORTANT : Fermer les ressources et réactiver autoCommit
+            // NE PAS FERMER la connexion (Singleton)
+
+            if (generatedKeys != null) {
+                try {
+                    generatedKeys.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet generatedKeys", e);
+                }
+            }
+
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
+            }
+
+            // ✅ CRUCIAL : Réactiver autoCommit pour les prochaines opérations
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
+                }
+            }
+
+            //  NE PAS FERMER connection (gérée par Singleton)
         }
     }
+
 
     /**
      * Met à jour un client existant dans la base de données avec transaction.
