@@ -1,5 +1,6 @@
 package main.com.julio.view;
 
+import main.com.julio.exception.DAOException;
 import main.com.julio.model.Client;
 import main.com.julio.model.Prospect;
 import main.com.julio.service.LoggerService;
@@ -14,18 +15,17 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static main.com.julio.service.LoggingService.LOGGER;
-
 /**
  * Vue d'accueil de l'application.
  * Permet de choisir entre la gestion des Clients et des Prospects.
  *
  * @author Julio FERMIN
- * @version 2.0
- * @since 20/01/2026
+ * @version 2.1
+ * @since 21/01/2026
  */
 public class AccueilView extends JFrame {
     private static final Logger LOGGER = LoggerService.getLogger(AccueilView.class);
+
     // ViewModels - Pattern MVVM pour séparer logique métier et présentation
     private final ClientViewModel clientVM;
     private final ProspectViewModel prospectVM;
@@ -292,49 +292,77 @@ public class AccueilView extends JFrame {
         this.currentAction = action;
         comboSelect.removeAllItems();  // Vider la combo
 
-        if (isClientSelected()) {
-            // Charger les clients
-            List<Client> clients = clientVM.getTousLesClients();
-            if (clients.isEmpty()) {
-                DisplayDialog.messageInfo("Info", "Aucun client disponible");
-                this.currentAction = null;
-                setSelectPanelVisible(false);
-                return;
-            }
-            for (Client c : clients) {
-                comboSelect.addItem(c);
-            }
-        } else {
-            // Charger les prospects
-            List<Prospect> prospects = prospectVM.getTousLesProspects();
-            if (prospects.isEmpty()) {
-                DisplayDialog.messageInfo("Info", "Aucun prospect disponible");
-                this.currentAction = null;
-                setSelectPanelVisible(false);
-                return;
-            }
-            for (Prospect p : prospects) {
-                comboSelect.addItem(p);
-            }
-        }
+        try {
+            // ✅ Gestion d'exception pour le chargement
+            if (isClientSelected()) {
+                // Charger les clients
+                List<Client> clients = clientVM.getTousLesClients();
 
-        // Renderer personnalisé pour afficher: "Raison Sociale (ID x)"
-        comboSelect.setRenderer(new DefaultListCellRenderer() {
-            @Override
-            public Component getListCellRendererComponent(JList<?> list, Object value,
-                                                          int index, boolean isSelected,
-                                                          boolean cellHasFocus) {
-                Component c = super.getListCellRendererComponent(list, value, index,
-                        isSelected, cellHasFocus);
-                if (value instanceof Client cli) {
-                    setText(cli.getRaisonSociale() + " (ID " + cli.getId() + ")");
-                } else if (value instanceof Prospect pro) {
-                    setText(pro.getRaisonSociale() + " (ID " + pro.getId() + ")");
+                if (clients.isEmpty()) {
+                    DisplayDialog.messageInfo("Info", "Aucun client disponible");
+                    this.currentAction = null;
+                    setSelectPanelVisible(false);
+                    return;
                 }
-                return c;
+
+                for (Client c : clients) {
+                    comboSelect.addItem(c);
+                }
+
+            } else {
+                // Charger les prospects
+                List<Prospect> prospects = prospectVM.getTousLesProspects();
+
+                if (prospects.isEmpty()) {
+                    DisplayDialog.messageInfo("Info", "Aucun prospect disponible");
+                    this.currentAction = null;
+                    setSelectPanelVisible(false);
+                    return;
+                }
+
+                for (Prospect p : prospects) {
+                    comboSelect.addItem(p);
+                }
             }
-        });
-        setSelectPanelVisible(true);
+
+            // Renderer personnalisé pour afficher: "Raison Sociale (ID x)"
+            comboSelect.setRenderer(new DefaultListCellRenderer() {
+                @Override
+                public Component getListCellRendererComponent(JList<?> list, Object value,
+                                                              int index, boolean isSelected,
+                                                              boolean cellHasFocus) {
+                    Component c = super.getListCellRendererComponent(list, value, index,
+                            isSelected, cellHasFocus);
+                    if (value instanceof Client cli) {
+                        setText(cli.getRaisonSociale() + " (ID " + cli.getId() + ")");
+                    } else if (value instanceof Prospect pro) {
+                        setText(pro.getRaisonSociale() + " (ID " + pro.getId() + ")");
+                    }
+                    return c;
+                }
+            });
+
+            setSelectPanelVisible(true);
+
+        } catch (DAOException e) {
+            // ✅ Gestion erreur chargement
+            String type = isClientSelected() ? "clients" : "prospects";
+            String message = switch (e.getErrorCode()) {
+                case CONNECTION_ERROR ->
+                        "Impossible de se connecter à la base de données.\n" +
+                                "Vérifiez que le serveur MySQL est démarré.";
+                case READ_ERROR ->
+                        "Erreur lors de la lecture des " + type + ".";
+                default ->
+                        "Erreur lors du chargement des " + type + " :\n" + e.getMessage();
+            };
+
+            DisplayDialog.messageError("Erreur de Chargement", message);
+
+            // Annuler l'action en cours
+            this.currentAction = null;
+            setSelectPanelVisible(false);
+        }
     }
 
     /**
