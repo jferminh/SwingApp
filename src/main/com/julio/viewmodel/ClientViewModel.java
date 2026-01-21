@@ -1,52 +1,45 @@
 package main.com.julio.viewmodel;
 
-import main.com.julio.dao.AdresseDAO;
 import main.com.julio.dao.ClientDAO;
 import main.com.julio.dao.ContratDAO;
 import main.com.julio.exception.DAOException;
-import main.com.julio.exception.NotFoundException;
 import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Adresse;
 import main.com.julio.model.Client;
-import main.com.julio.repository.ClientRepository;
-import main.com.julio.repository.ContratRepository;
 import main.com.julio.service.LoggerService;
-import main.com.julio.service.UnicityService;
 
-import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static main.com.julio.exception.DAOException.ErrorCode.*;
-import static main.com.julio.service.LoggingService.LOGGER;
 
 /**
  * ViewModel pour la gestion des clients.
  * Fait le lien entre la Vue et les DAO (pattern MVVM).
  * <p>
  * Cette classe orchestre les opérations CRUD sur les clients en utilisant
- * les DAO (ClientDAO, ContratDAO, AdresseDAO) et en gérant les exceptions
+ * les DAO (ClientDAO, ContratDAO) et en gérant les exceptions
  * de manière appropriée pour la couche présentation.
  * <p>
  * Responsabilités :
- * 1 Validation des données d'entrée de l'utilisateur
- * 2 Orchestration des opérations DAO
- * 3 Transformation des exceptions DAO en messages utilisateur
- * 4 Préparation des données pour l'affichage (TableModel)
- * 5 Logging des opérations métier
+ * 1. Validation des données d'entrée de l'utilisateur
+ * 2. Orchestration des opérations DAO
+ * 3. Transformation des exceptions DAO en exceptions métier
+ * 4. Préparation des données pour l'affichage (TableModel)
+ * 5. Logging des erreurs critiques uniquement
+ * <p>
+ * <strong>Note :</strong> Ce ViewModel ne gère PAS l'affichage UI directement.
+ * Les vues (panels) sont responsables d'afficher les messages d'erreur.
  *
  * @author Julio FERMIN
- * @version 2.0
- * @since 20/01/2026
+ * @version 2.1
+ * @since 21/01/2026
  */
 public class ClientViewModel {
     private static final Logger LOGGER = LoggerService.getLogger(ClientViewModel.class);
 
     private final ClientDAO clientDAO;
     private final ContratDAO contratDAO;
-    private final AdresseDAO adresseDAO;
 
     /**
      * Constructeur avec injection des DAO.
@@ -56,17 +49,15 @@ public class ClientViewModel {
     public ClientViewModel() throws DAOException {
         this.clientDAO = new ClientDAO();
         this.contratDAO = new ContratDAO();
-        this.adresseDAO = new AdresseDAO();
     }
 
     /**
      * Crée un nouveau client avec son adresse.
      * <p>
-     * Processus :
-     * 1. Valide les données d'entrée
-     * 2. Crée l'adresse via AdresseDAO
-     * 3. Crée le client via ClientDAO
-     * 4. Logue l'opération
+     * <strong>IMPORTANT :</strong> L'adresse est créée dans la même transaction
+     * que le client via ClientDAO.create(). Si la création échoue, aucune donnée
+     * n'est persistée (rollback complet).
+     * </p>
      *
      * @param raisonSociale raison sociale du client
      * @param numeroRue numéro de rue
@@ -79,26 +70,29 @@ public class ClientViewModel {
      * @param chiffreAffaires chiffre d'affaires (>= 200)
      * @param nbEmployes nombre d'employés (>= 1)
      * @return le client créé avec son ID généré
-     * @throws IllegalArgumentException si les données sont invalides
-     * @throws RuntimeException si une erreur DAO survient
+     * @throws ValidationException si les données ne respectent pas les contraintes métier
+     * @throws DAOException si une erreur survient lors de la persistance
      */
     public Client creerClient(String raisonSociale,
-                            String numeroRue,
-                            String nomRue,
-                            String codePostal,
-                            String ville,
-                            String telephone,
-                            String email,
-                            String commentaires,
-                            long chiffreAffaires,
-                            int nbEmployes) {
-        try {
-            // 1. Créer et persister l'adresse
-            Adresse adresse = new Adresse(numeroRue, nomRue, codePostal, ville);
-            adresse = adresseDAO.create(adresse);
-            LOGGER.log(Level.FINE, "Adresse créée avec ID={0}", adresse.getId());
+                              String numeroRue,
+                              String nomRue,
+                              String codePostal,
+                              String ville,
+                              String telephone,
+                              String email,
+                              String commentaires,
+                              long chiffreAffaires,
+                              int nbEmployes) throws ValidationException, DAOException {
 
-            // 2. Créer et persister le client
+        try {
+            // Créer l'entité Client avec Adresse
+            Adresse adresse = new main.com.julio.model.Adresse(
+                    numeroRue,
+                    nomRue,
+                    codePostal,
+                    ville
+            );
+
             Client client = new Client(
                     raisonSociale,
                     adresse,
@@ -108,46 +102,29 @@ public class ClientViewModel {
                     chiffreAffaires,
                     nbEmployes
             );
-            client = clientDAO.create(client);
 
-            LOGGER.log(Level.INFO,
-                    "Client créé avec succès : ID={0}, Raison sociale={1}",
-                    new Object[]{client.getId(), raisonSociale});
+            // ClientDAO.create() gère TOUTE la transaction
+            client = clientDAO.create(client);
 
             return client;
 
         } catch (ValidationException e) {
-            LOGGER.log(Level.WARNING, "Erreur de validation lors de la création du client", e);
-            throw new IllegalArgumentException(
-                    "Données invalides : " + e.getMessage(), e
-            );
+            throw e;
+
         } catch (DAOException e) {
-            LOGGER.log(Level.SEVERE, "Erreur DAO lors de la création du client", e);
-
-            // Analyser le type d'erreur pour un message utilisateur approprié
-            String messageUtilisateur = switch (e.getErrorCode()) {
-                case UNIQUE_CONSTRAINT_VIOLATION ->
-                        "Cette raison sociale existe déjà.";
-                case FOREIGN_KEY_VIOLATION ->
-                        "Erreur de référence dans la base de données.";
-                case CONNECTION_ERROR ->
-                        "Impossible de se connecter à la base de données.";
-                default ->
-                        "Erreur lors de la création du client : " + e.getMessage();
-            };
-
-            throw new RuntimeException(messageUtilisateur, e);
+            LOGGER.log(Level.SEVERE,
+                    "Erreur DAO création client : {0}",
+                    e.getMessage());
+            throw e;
         }
     }
 
     /**
      * Modifie un client existant.
      * <p>
-     * Processus :
-     * 1. Récupère le client existant
-     * 2. Met à jour les données
-     * 3. Met à jour l'adresse via AdresseDAO
-     * 4. Met à jour le client via ClientDAO
+     * <strong>IMPORTANT :</strong> La modification de l'adresse est incluse
+     * dans la transaction de ClientDAO.save(). Rollback complet en cas d'erreur.
+     * </p>
      *
      * @param id identifiant du client
      * @param raisonSociale nouvelle raison sociale
@@ -160,31 +137,31 @@ public class ClientViewModel {
      * @param commentaires nouveaux commentaires
      * @param chiffreAffaires nouveau chiffre d'affaires
      * @param nbEmployes nouveau nombre d'employés
-     * @return true si la modification a réussi
-     * @throws IllegalArgumentException si les données sont invalides ou si le client n'existe pas
-     * @throws RuntimeException si une erreur DAO survient
+     * @return true si la modification a réussi, false si le client n'existe pas
+     * @throws ValidationException si les données ne respectent pas les contraintes métier
+     * @throws DAOException si une erreur survient lors de la persistance
      */
     public boolean modifierClient(Integer id,
-                               String raisonSociale,
-                               String numeroRue,
-                               String nomRue,
-                               String codePostal,
-                               String ville,
-                               String telephone,
-                               String email,
-                               String commentaires,
-                               long chiffreAffaires,
-                               int nbEmployes) throws ValidationException, NotFoundException {
+                                  String raisonSociale,
+                                  String numeroRue,
+                                  String nomRue,
+                                  String codePostal,
+                                  String ville,
+                                  String telephone,
+                                  String email,
+                                  String commentaires,
+                                  long chiffreAffaires,
+                                  int nbEmployes) throws ValidationException, DAOException {
+
         try {
-            // 1. Récupérer le client existant
+            // Récupérer le client existant
             Client client = clientDAO.findById(id);
 
             if (client == null) {
-                LOGGER.log(Level.WARNING, "Client ID={0} introuvable pour modification", id);
-                throw new IllegalArgumentException("Client introuvable avec l'ID " + id);
+                return false;
             }
 
-            // 2. Mettre à jour les données du client
+            // Mettre à jour les données
             client.setRaisonSociale(raisonSociale);
             client.setTelephone(telephone);
             client.setEmail(email);
@@ -192,82 +169,45 @@ public class ClientViewModel {
             client.setChiffreAffaires(chiffreAffaires);
             client.setNbEmployes(nbEmployes);
 
-            // 3. Mettre à jour l'adresse
+            // Mettre à jour l'adresse
             Adresse adresse = client.getAdresse();
             adresse.setNumeroRue(numeroRue);
             adresse.setNomRue(nomRue);
             adresse.setCodePostal(codePostal);
             adresse.setVille(ville);
 
-            adresseDAO.save(adresse);
-
-            // 4. Sauvegarder le client
-            boolean success = clientDAO.save(client);
-
-            if (success) {
-                LOGGER.log(Level.INFO, "Client modifié avec succès : ID={0}", id);
-            }
-
-            return success;
-
-
+            // Persister les modifications
+            return clientDAO.save(client);
 
         } catch (ValidationException e) {
-            LOGGER.log(Level.WARNING, "Erreur de validation lors de la modification du client ID=" + id, e);
-            throw new IllegalArgumentException(
-                    "Données invalides : " + e.getMessage(), e
-            );
+            throw e;
+
         } catch (DAOException e) {
-            LOGGER.log(Level.SEVERE, "Erreur DAO lors de la modification du client ID=" + id, e);
-
-            String messageUtilisateur = switch (e.getErrorCode()) {
-                case ENTITY_NOT_FOUND ->
-                        "Client introuvable.";
-                case UNIQUE_CONSTRAINT_VIOLATION ->
-                        "Cette raison sociale existe déjà.";
-                default ->
-                        "Erreur lors de la modification du client : " + e.getMessage();
-            };
-
-            throw new RuntimeException(messageUtilisateur, e);
+            LOGGER.log(Level.SEVERE,
+                    "Erreur DAO modification client ID={0} : {1}",
+                    new Object[]{id, e.getMessage()});
+            throw e;
         }
     }
 
     /**
      * Supprime un client.
      * <p>
-     * IMPORTANT : La suppression est bloquée si le client possède des contrats.
+     * <strong>IMPORTANT :</strong> La suppression est bloquée si le client possède des contrats.
+     * La vérification est faite par ClientDAO.delete() qui lève une DAOException
+     * avec ErrorCode.FOREIGN_KEY_VIOLATION.
+     * </p>
      *
      * @param id identifiant du client à supprimer
-     * @return true si la suppression a réussi
-     * @throws IllegalArgumentException si le client possède des contrats
-     * @throws RuntimeException si une erreur DAO survient
+     * @return true si la suppression a réussi, false si le client n'existe pas
+     * @throws DAOException si une erreur survient (notamment si le client a des contrats)
      */
-    public boolean supprimerClient(Integer id) {
+    public boolean supprimerClient(Integer id) throws DAOException {
         try {
             return clientDAO.delete(id);
 
         } catch (DAOException e) {
-            if (e.getErrorCode() == DAOException.ErrorCode.FOREIGN_KEY_VIOLATION) {
-                // Message spécifique pour l'utilisateur
-                JOptionPane.showMessageDialog(
-                        null,
-                        "Impossible de supprimer ce client car il possède des contrats.\n" +
-                                "Veuillez d'abord supprimer ou réaffecter ses contrats.",
-                        "Suppression refusée",
-                        JOptionPane.WARNING_MESSAGE
-                );
-            } else {
-                // Erreur technique générique
-                JOptionPane.showMessageDialog(
-                        null,
-                        "Erreur lors de la suppression : " + e.getMessage(),
-                        "Erreur",
-                        JOptionPane.ERROR_MESSAGE
-                );
-            }
-
-            return false;
+            throw e;
         }
     }
 
@@ -276,25 +216,17 @@ public class ClientViewModel {
      *
      * @param id identifiant du client
      * @return le client ou null si non trouvé
-     * @throws RuntimeException si une erreur DAO survient
+     * @throws DAOException si une erreur survient lors de la récupération
      */
-    public Client getClientById(Integer id) {
+    public Client getClientById(Integer id) throws DAOException {
         try {
-            Client client = clientDAO.findById(id);
-
-            if (client != null) {
-                LOGGER.log(Level.FINE,
-                        "Client trouvé : ID={0}, {1} contrat(s)",
-                        new Object[]{id, client.getContrats().size()});
-            }
-
-            return client;
+            return clientDAO.findById(id);
 
         } catch (DAOException e) {
-            LOGGER.log(Level.SEVERE, "Erreur lors de la récupération du client ID=" + id, e);
-            throw new RuntimeException(
-                    "Erreur lors de la récupération du client : " + e.getMessage(), e
-            );
+            LOGGER.log(Level.SEVERE,
+                    "Erreur récupération client ID={0} : {1}",
+                    new Object[]{id, e.getMessage()});
+            throw e;
         }
     }
 
@@ -302,22 +234,17 @@ public class ClientViewModel {
      * Récupère tous les clients triés par raison sociale.
      *
      * @return liste de tous les clients (peut être vide)
-     * @throws RuntimeException si une erreur DAO survient
+     * @throws DAOException si une erreur survient lors de la récupération
      */
-    public List<Client> getTousLesClients() {
-
+    public List<Client> getTousLesClients() throws DAOException {
         try {
-            List<Client> clients = clientDAO.findAll();
-
-            LOGGER.log(Level.INFO, "{0} client(s) récupéré(s)", clients.size());
-
-            return clients;
+            return clientDAO.findAll();
 
         } catch (DAOException e) {
-            LOGGER.log(Level.SEVERE, "Erreur lors de la récupération des clients", e);
-            throw new RuntimeException(
-                    "Erreur lors de la récupération de la liste des clients : " + e.getMessage(), e
-            );
+            LOGGER.log(Level.SEVERE,
+                    "Erreur récupération clients : {0}",
+                    e.getMessage());
+            throw e;
         }
     }
 
@@ -325,37 +252,39 @@ public class ClientViewModel {
      * Construit un modèle de table Swing pour affichage des clients.
      * <p>
      * Crée un DefaultTableModel non-éditable avec colonnes :
-     * ID, Raison Sociale, Adresse, Téléphone, Email, CA (€), Nb Employés
+     * ID, Raison Sociale, Adresse, Téléphone, Email, CA (€), Nb Employés, Nb Contrats
      * </p>
      *
      * @return modèle de table prêt pour JTable
+     * @throws DAOException si une erreur survient lors de la récupération des clients
      */
-    public DefaultTableModel construireTableModel() {
+    public DefaultTableModel construireTableModel() throws DAOException {
         String[] colonnes = {"ID", "Raison Sociale", "Adresse", "Téléphone",
-                "Email", "CA (€)", "Nb Employés"};
+                "Email", "CA (€)", "Nb Employés", "Nb Contrats"};
 
-        // Modèle non-éditable via override isCellEditable
         DefaultTableModel model = new DefaultTableModel(colonnes, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return false;  // Toutes cellules en lecture seule
+                return false;
             }
         };
 
-        // Remplissage avec données clients
         List<Client> clients = getTousLesClients();
+
         for (Client client : clients) {
             Object[] row = {
                     client.getId(),
                     client.getRaisonSociale(),
-                    client.getAdresse().toString(),  // Formatage adresse
+                    client.getAdresse().toString(),
                     client.getTelephone(),
                     client.getEmail(),
                     String.format("%,d €", client.getChiffreAffaires()),
-                    client.getNbEmployes()
+                    client.getNbEmployes(),
+                    client.getContrats().size()
             };
             model.addRow(row);
         }
+
         return model;
     }
 
@@ -364,11 +293,35 @@ public class ClientViewModel {
      * <p>
      * Les clients sont triés par raison sociale.
      * La méthode toString() de Client retourne "Raison Sociale (Client)".
+     * </p>
      *
      * @return un tableau de clients (peut être vide)
+     * @throws DAOException si une erreur survient lors de la récupération
      */
-    public Client[] getClientsForComboBox() {
+    public Client[] getClientsForComboBox() throws DAOException {
         List<Client> clients = getTousLesClients();
         return clients.toArray(new Client[0]);
+    }
+
+    /**
+     * Récupère le nombre de contrats d'un client.
+     * <p>
+     * Méthode utilitaire pour afficher rapidement le nombre de contrats
+     * sans charger le client complet.
+     * </p>
+     *
+     * @param clientId identifiant du client
+     * @return le nombre de contrats
+     * @throws DAOException si une erreur survient
+     */
+    public int getNombreContrats(Integer clientId) throws DAOException {
+        try {
+            return contratDAO.findByIdClient(clientId).size();
+        } catch (DAOException e) {
+            LOGGER.log(Level.SEVERE,
+                    "Erreur comptage contrats client ID={0}",
+                    clientId);
+            throw e;
+        }
     }
 }
