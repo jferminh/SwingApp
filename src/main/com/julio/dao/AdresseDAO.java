@@ -165,69 +165,63 @@ public class AdresseDAO {
             );
         }
 
-        String query = "INSERT INTO adresse (" +
-                "numero_rue, " +
-                "nom_rue, " +
-                "code_postal, " +
-                "ville) " +
+        String sql = "INSERT INTO adresse (numero_rue, nom_rue, code_postal, ville) " +
                 "VALUES (?, ?, ?, ?)";
 
-        Connection connection = dbConnexion.getConnection();
+        PreparedStatement pstmt = null;
+        ResultSet generatedKeys = null;
+
         try {
-            connection.setAutoCommit(false);
-            try (PreparedStatement pstmt = connection.prepareStatement(
-                    query, PreparedStatement.RETURN_GENERATED_KEYS)) {
+            // ✅ Récupérer la connexion (peut être en transaction)
+            Connection connection = dbConnexion.getConnection();
 
-                pstmt.setString(1, adresse.getNumeroRue());
-                pstmt.setString(2, adresse.getNomRue());
-                pstmt.setString(3, adresse.getCodePostal());
-                pstmt.setString(4, adresse.getVille());
+            pstmt = connection.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS);
+            pstmt.setString(1, adresse.getNumeroRue());
+            pstmt.setString(2, adresse.getNomRue());
+            pstmt.setString(3, adresse.getCodePostal());
+            pstmt.setString(4, adresse.getVille());
 
-                int rowsAffected = pstmt.executeUpdate();
+            int rowsAffected = pstmt.executeUpdate();
 
-                if (rowsAffected == 0) {
-                    throw new SQLException("L'insertion de l'adresse a échoué, aucune ligne affectée");
-                }
+            if (rowsAffected == 0) {
+                throw new SQLException("L'insertion de l'adresse a échoué, aucune ligne affectée");
+            }
 
-                // Récupérer l'ID généré
-                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        adresse.setId(generatedKeys.getInt(1));
-                        connection.commit();
+            generatedKeys = pstmt.getGeneratedKeys();
 
-//                    LOGGER.log(Level.INFO, "Adresse créée avec l'ID {0}", adresse.getId());
+            if (generatedKeys.next()) {
+                Integer adresseId = generatedKeys.getInt(1);
+                adresse.setId(adresseId);
 
-                    } else {
-                        throw new SQLException("L'insertion a échoué, aucun ID généré");
-                    }
-                }
                 return adresse;
+            } else {
+                throw new SQLException("L'insertion a échoué, aucun ID généré");
             }
+
         } catch (SQLException e) {
-            try {
-                connection.rollback();
-                LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur de création", e);
-            } catch (SQLException ex) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", ex);
-            }
-
-            LOGGER.log(Level.SEVERE, "Erreur lors de la création de l'adresse", e);
-
+            LOGGER.log(Level.SEVERE, "Erreur SQL lors de create adresse", e);
             throw new DAOException(
                     SQLExceptionAnalyzer.categorize(e),
                     "create",
-                    adresse.getId(),
-                    "Erreur lors de la création de l'adresse : " + SQLExceptionAnalyzer.analyze(e),
+                    null,
+                    "Erreur création adresse : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
         } finally {
-            try {
-                connection.setAutoCommit(true);
-            } catch (SQLException ex) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la réactivatio de l'autoCommit", ex);
+            // ✅ Fermer seulement rs et pstmt
+            if (generatedKeys != null) {
+                try { generatedKeys.close(); }
+                catch (SQLException e) { LOGGER.log(Level.WARNING, "Erreur fermeture RS", e); }
             }
+            if (pstmt != null) {
+                try { pstmt.close(); }
+                catch (SQLException e) { LOGGER.log(Level.WARNING, "Erreur fermeture pstmt", e); }
+            }
+            //  NE PAS fermer connection
+            //  NE PAS gérer transaction
         }
     }
+
 
     /**
      * Met à jour une adresse existante dans la base de données.

@@ -59,20 +59,32 @@ public class ProspectDAO extends SocieteDAO {
      */
     public List<Prospect> findAll() throws DAOException {
         List<Prospect> prospects = new ArrayList<>();
-        String sql = "SELECT p.id_prospect, p.id_societe, p.date_prospection, p.interesse, " +
-                "s.raison_sociale, s.adresse_id, s.telephone, s.email, s.commentaires, " +
-                "a.numero_rue, a.nom_rue, a.code_postal, a.ville " +
+
+        String sql = "SELECT " +
+                "    p.id_prospect, p.id_societe, p.date_prospection, p.interesse, " +
+                "    s.raison_sociale, s.adresse_id, s.telephone, s.email, s.commentaires, " +
+                "    a.numero_rue, a.nom_rue, a.code_postal, a.ville " +
                 "FROM prospect p " +
                 "INNER JOIN societe s ON p.id_societe = s.id_societe " +
                 "INNER JOIN adresse a ON s.adresse_id = a.id_adresse " +
-                "ORDER BY s.raison_sociale";
+                "ORDER BY s.raison_sociale ASC";
 
-        try (Statement stmt = dbConnexion.getConnection().createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            Connection conn = dbConnexion.getConnection();
+            pstmt = conn.prepareStatement(sql); // ✅ PreparedStatement au lieu de Statement
+            rs = pstmt.executeQuery();
 
             while (rs.next()) {
-                Prospect prospect = mapResultSetToProspect(rs);
-                prospects.add(prospect);
+                try {
+                    Prospect prospect = mapResultSetToProspect(rs);
+                    prospects.add(prospect);
+
+                } catch (ValidationException e) {
+                    Integer prospectId = rs.getInt("id_prospect");
+                }
             }
 
             return prospects;
@@ -86,24 +98,30 @@ public class ProspectDAO extends SocieteDAO {
                     "Erreur lors de la récupération de tous les prospects : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
-        } catch (ValidationException e) {
-            LOGGER.log(Level.SEVERE, "Erreur de validation lors du mapping dans findAll()", e);
-            throw new DAOException(
-                    DAOException.ErrorCode.READ_ERROR,
-                    "findAll",
-                    null,
-                    "Erreur de validation des données du prospect : " + e.getMessage(),
-                    e
-            );
+        } finally {
+            if (rs != null) {
+                try {
+                    rs.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
+                }
+            }
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
+            }
         }
     }
 
     /**
-     * Récupère un prospect par son identifiant.
+     * Recherche un prospect par son identifiant.
      *
-     * @param id l'identifiant du prospect (id dans table prospect, pas id_societe)
-     * @return le prospect correspondant ou null si non trouvé
-     * @throws DAOException si une erreur survient lors de la requête
+     * @param id l'identifiant du prospect à rechercher
+     * @return le prospect trouvé, ou null si aucun prospect ne correspond
+     * @throws DAOException si une erreur survient lors de la recherche
      */
     public Prospect findById(Integer id) throws DAOException {
         if (id == null || id <= 0) {
@@ -115,25 +133,44 @@ public class ProspectDAO extends SocieteDAO {
             );
         }
 
-        String sql = "SELECT p.id_prospect, p.id_societe, p.date_prospection, p.interesse, " +
-                "s.raison_sociale, s.adresse_id, s.telephone, s.email, s.commentaires, " +
-                "a.numero_rue, a.nom_rue, a.code_postal, a.ville " +
+        String sql = "SELECT " +
+                "    p.id_prospect, p.id_societe, p.date_prospection, p.interesse, " +
+                "    s.raison_sociale, s.adresse_id, s.telephone, s.email, s.commentaires, " +
+                "    a.numero_rue, a.nom_rue, a.code_postal, a.ville " +
                 "FROM prospect p " +
                 "INNER JOIN societe s ON p.id_societe = s.id_societe " +
                 "INNER JOIN adresse a ON s.adresse_id = a.id_adresse " +
-                "WHERE p.id_prospect = ? ";
+                "WHERE p.id_prospect = ?";
 
-        try (PreparedStatement pstmt = dbConnexion.getConnection().prepareStatement(sql)) {
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
 
+        try {
+            // ✅ CORRECTION : Ne pas utiliser try-with-resources sur la connexion
+            Connection conn = dbConnexion.getConnection();
+            pstmt = conn.prepareStatement(sql);
             pstmt.setInt(1, id);
+            rs = pstmt.executeQuery();
 
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
+            if (rs.next()) {
+                try {
                     Prospect prospect = mapResultSetToProspect(rs);
+
                     return prospect;
-                } else {
-                    return null;
+
+                } catch (ValidationException e) {
+                    LOGGER.log(Level.SEVERE,
+                            "Erreur de validation lors du mapping du prospect ID={0}", id);
+                    throw new DAOException(
+                            DAOException.ErrorCode.INVALID_PARAMETER,
+                            "findById",
+                            id,
+                            "Données invalides pour le prospect : " + e.getMessage(),
+                            e
+                    );
                 }
+            } else {
+                return null;
             }
 
         } catch (SQLException e) {
@@ -145,30 +182,38 @@ public class ProspectDAO extends SocieteDAO {
                     "Erreur lors de la recherche du prospect : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
-        } catch (ValidationException e) {
-            LOGGER.log(Level.SEVERE, "Erreur de validation lors du mapping dans findById, ID=" + id, e);
-            throw new DAOException(
-                    DAOException.ErrorCode.READ_ERROR,
-                    "findById",
-                    id,
-                    "Erreur de validation des données du prospect : " + e.getMessage(),
-                    e
-            );
+        } finally {
+            // ✅ IMPORTANT : Fermer SEULEMENT ResultSet et PreparedStatement
+            // NE PAS FERMER la connexion (gérée par Singleton)
+            if (rs != null) {
+                try {
+                    rs.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur lors de la fermeture du ResultSet", e);
+                }
+            }
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur lors de la fermeture du PreparedStatement", e);
+                }
+            }
         }
     }
 
     /**
-     * Insère un nouveau prospect dans la base de données avec transaction.
-     * <p>
-     * Processus :
-     * 1. Démarre une transaction
-     * 2. Insère la partie société (table societe) via SocieteDAO
-     * 3. Insère la partie prospect (table prospect) avec id_societe comme FK
-     * 4. Commit de la transaction
+     * Crée un nouveau prospect dans la base de données.
      *
-     * @param prospect le prospect à insérer
-     * @return le prospect avec son ID généré
-     * @throws DAOException si une erreur survient lors de l'insertion
+     * <p>Cette méthode effectue une transaction qui :</p>
+     * <ul>
+     *   <li>Insère d'abord la société (via createSociete)</li>
+     *   <li>Puis insère le prospect avec l'ID société généré</li>
+     * </ul>
+     *
+     * @param prospect le prospect à créer (ne doit pas être null)
+     * @return le prospect créé avec son ID généré
+     * @throws DAOException si une erreur survient lors de la création
      */
     public Prospect create(Prospect prospect) throws DAOException {
         if (prospect == null) {
@@ -181,54 +226,64 @@ public class ProspectDAO extends SocieteDAO {
             );
         }
 
-        Connection conn = dbConnexion.getConnection();
+        Connection connection = null;
+        PreparedStatement pstmt = null;
+        ResultSet generatedKeys = null;
 
         try {
-            conn.setAutoCommit(false);
+            // ✅ CORRECTION : Récupérer la connexion sans try-with-resources
+            connection = dbConnexion.getConnection();
+            connection.setAutoCommit(false);
 
-            // 1. Insérer la partie société (via classe mère)
+            // ========== ÉTAPE 1 : Insérer la partie société ==========
             Integer societeId = createSociete(prospect);
 
-            // 2. Insérer la partie prospect avec id_societe comme FK
+            // ========== ÉTAPE 2 : Insérer la partie prospect ==========
             String sql = "INSERT INTO prospect (id_societe, date_prospection, interesse) " +
                     "VALUES (?, ?, ?)";
 
-            try (PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-                pstmt.setInt(1, societeId);
-                pstmt.setDate(2, Date.valueOf(prospect.getDateProspection()));
-                pstmt.setInt(3, prospect.getInteresse().toInt());
+            pstmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            pstmt.setInt(1, societeId);
+            pstmt.setDate(2, Date.valueOf(prospect.getDateProspection()));
+            pstmt.setInt(3, prospect.getInteresse().toInt());
 
-                int rowsAffected = pstmt.executeUpdate();
+            int rowsAffected = pstmt.executeUpdate();
 
-                if (rowsAffected == 0) {
-                    throw new SQLException("L'insertion du prospect a échoué, aucune ligne affectée");
-                }
+            if (rowsAffected == 0) {
+                throw new SQLException("L'insertion du prospect a échoué, aucune ligne affectée");
+            }
 
-                // Récupérer l'ID généré pour le prospect
-                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        Integer prospectId = generatedKeys.getInt(1);
-                        prospect.setId(prospectId);  // ID de la table prospect
+            // ========== ÉTAPE 3 : Récupérer l'ID généré ==========
+            generatedKeys = pstmt.getGeneratedKeys();
 
-                        conn.commit();
-                        LOGGER.log(Level.INFO,
-                                "Prospect créé avec succès : ID prospect={0}, ID société={1}, Raison sociale={2}, Date={3}, Intéressé={4}",
-                                new Object[]{prospectId, societeId, prospect.getRaisonSociale(),
-                                        prospect.getDateProspection(), prospect.getInteresse()});
-                    } else {
-                        throw new SQLException("L'insertion a échoué, aucun ID généré");
-                    }
-                }
+            if (generatedKeys.next()) {
+                Integer prospectId = generatedKeys.getInt(1);
+                prospect.setId(prospectId);  // ID de la table prospect
+
+                // ✅ COMMIT : Transaction réussie
+                connection.commit();
+
+                LOGGER.log(Level.INFO,
+                        "Prospect créé avec succès : ID prospect={0}, ID société={1}, " +
+                                "Raison sociale={2}, Date={3}, Intéressé={4}",
+                        new Object[]{prospectId, societeId, prospect.getRaisonSociale(),
+                                prospect.getDateProspection(), prospect.getInteresse()});
 
                 return prospect;
+
+            } else {
+                throw new SQLException("L'insertion a échoué, aucun ID généré");
             }
 
         } catch (SQLException e) {
-            try {
-                conn.rollback();
-                LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur de création", e);
-            } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+            // ✅ ROLLBACK en cas d'erreur SQL
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur SQL", e);
+                } catch (SQLException rollbackEx) {
+                    LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+                }
             }
 
             LOGGER.log(Level.SEVERE, "Erreur SQL lors de la création du prospect", e);
@@ -239,22 +294,53 @@ public class ProspectDAO extends SocieteDAO {
                     "Erreur lors de la création du prospect : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
+
         } catch (DAOException e) {
-            try {
-                conn.rollback();
-                LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur DAO", e);
-            } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+            // ✅ ROLLBACK en cas d'erreur DAO (createSociete peut lever DAOException)
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur DAO", e);
+                } catch (SQLException rollbackEx) {
+                    LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+                }
             }
             throw e;
+
         } finally {
-            try {
-                conn.setAutoCommit(true);
-            } catch (SQLException e) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", e);
+            // ✅ IMPORTANT : Fermer les ressources et réactiver autoCommit
+            // NE PAS FERMER la connexion (Singleton)
+
+            if (generatedKeys != null) {
+                try {
+                    generatedKeys.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet generatedKeys", e);
+                }
             }
+
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
+            }
+
+            // ✅ CRUCIAL : Réactiver autoCommit pour les prochaines opérations
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
+                }
+            }
+
+            // ❌ NE PAS FERMER connection (gérée par Singleton)
         }
     }
+
+
 
     /**
      * Met à jour un prospect existant dans la base de données avec transaction.

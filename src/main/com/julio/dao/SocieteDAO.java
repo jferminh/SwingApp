@@ -52,12 +52,17 @@ public abstract class SocieteDAO {
     }
 
     /**
-     * Insère une société (partie commune) dans la base de données.
-     * Cette méthode est utilisée par ClientDAO et ProspectDAO.
+     * Crée une société dans la base de données.
      *
-     * @param societe la société à insérer
-     * @return l'ID généré pour la société
-     * @throws DAOException si une erreur survient lors de l'insertion
+     * <p><strong>IMPORTANT :</strong> Cette méthode est appelée dans le contexte
+     * d'une transaction parent (depuis create()). Elle NE DOIT PAS gérer
+     * commit/rollback ni setAutoCommit.</p>
+     *
+     * <p>La transaction doit être gérée par l'appelant.</p>
+     *
+     * @param societe la société à créer
+     * @return l'ID de la société créée
+     * @throws DAOException si une erreur survient lors de la création
      */
     protected Integer createSociete(Societe societe) throws DAOException {
         if (societe == null) {
@@ -69,7 +74,7 @@ public abstract class SocieteDAO {
             );
         }
 
-        // 1. Créer ou récupérer l'adresse
+        // ========== ÉTAPE 1 : Valider et créer/récupérer l'adresse ==========
         Adresse adresse = societe.getAdresse();
         if (adresse == null) {
             throw new DAOException(
@@ -80,8 +85,10 @@ public abstract class SocieteDAO {
             );
         }
 
+        // Créer l'adresse si elle n'existe pas encore
         if (adresse.getId() == null) {
             try {
+                // ⚠️ ATTENTION : adresseDAO.create() doit AUSSI ne pas gérer de transaction
                 adresse = adresseDAO.create(adresse);
 
             } catch (DAOException ex) {
@@ -96,40 +103,46 @@ public abstract class SocieteDAO {
             }
         }
 
-        // 2. Insérer la société
-        String query = "INSERT INTO societe(raison_sociale" +
-                ", adresse_id, " +
-                "telephone, " +
-                "email, " +
-                "commentaires) " +
+        // ========== ÉTAPE 2 : Insérer la société ==========
+        String sql = "INSERT INTO societe (raison_sociale, adresse_id, telephone, email, commentaires) " +
                 "VALUES (?, ?, ?, ?, ?)";
 
-        try (PreparedStatement preparedStatement = dbConnexion.getConnection()
-                .prepareStatement(query, PreparedStatement.RETURN_GENERATED_KEYS)) {
-            preparedStatement.setString(1, societe.getRaisonSociale());
-            preparedStatement.setInt(2, adresse.getId());
-            preparedStatement.setString(3, societe.getTelephone());
-            preparedStatement.setString(4, societe.getEmail());
-            preparedStatement.setString(5, societe.getCommentaires());
+        PreparedStatement pstmt = null;
+        ResultSet generatedKeys = null;
 
-            int rowsAffected = preparedStatement.executeUpdate();
+        try {
+            // ✅ CORRECTION : Récupérer la connexion sans try-with-resources
+            // La connexion est en mode transaction (autoCommit=false) depuis create()
+            Connection connection = dbConnexion.getConnection();
+
+            pstmt = connection.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS);
+            pstmt.setString(1, societe.getRaisonSociale());
+            pstmt.setInt(2, adresse.getId());
+            pstmt.setString(3, societe.getTelephone());
+            pstmt.setString(4, societe.getEmail());
+            pstmt.setString(5, societe.getCommentaires());
+
+            int rowsAffected = pstmt.executeUpdate();
+
             if (rowsAffected == 0) {
                 throw new SQLException("L'insertion de la société a échoué, aucune ligne affectée");
             }
 
-            // Récupérer l'ID généré
-            try (ResultSet generatedKeys = preparedStatement.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    Integer societeId = generatedKeys.getInt(1);
-                    societe.setId(societeId);
-//                    LOGGER.log(Level.INFO, "Société créée avec l'ID {0}", societeId);
-                    return societeId;
-                } else {
-                    throw new SQLException("L'insertion a échoué, aucun ID généré");
-                }
+            // ========== ÉTAPE 3 : Récupérer l'ID généré ==========
+            generatedKeys = pstmt.getGeneratedKeys();
+
+            if (generatedKeys.next()) {
+                Integer societeId = generatedKeys.getInt(1);
+                societe.setId(societeId);
+
+                return societeId;
+
+            } else {
+                throw new SQLException("L'insertion a échoué, aucun ID généré");
             }
+
         } catch (SQLException sqlEx) {
-            LOGGER.log(Level.SEVERE, "Erreur lors de la création de la société", sqlEx);
+            LOGGER.log(Level.SEVERE, "Erreur SQL lors de la création de la société", sqlEx);
             throw new DAOException(
                     SQLExceptionAnalyzer.categorize(sqlEx),
                     "createSociete",
@@ -137,8 +150,35 @@ public abstract class SocieteDAO {
                     "Erreur lors de la création de la société : " + SQLExceptionAnalyzer.analyze(sqlEx),
                     sqlEx
             );
+        } finally {
+            // ✅ IMPORTANT : Fermer SEULEMENT ResultSet et PreparedStatement
+            // NE PAS :
+            // ._ Fermer la connexion (Singleton)
+            // ._ Faire commit/rollback (géré par l'appelant)
+            // ._ Modifier autoCommit (géré par l'appelant)
+
+            if (generatedKeys != null) {
+                try {
+                    generatedKeys.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet generatedKeys", e);
+                }
+            }
+
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
+            }
+
+            // NE PAS fermer connection
+            // NE PAS toucher à setAutoCommit
+            // NE PAS faire commit/rollback
         }
     }
+
 
     /**
      * Met à jour la partie société d'un client ou prospect dans une transaction existante.

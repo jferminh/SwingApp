@@ -115,7 +115,6 @@ public class ClientDAO extends SocieteDAO {
                 }
             }
 
-            LOGGER.log(Level.INFO, "{0} client(s) récupéré(s)", clientsMap.size());
             return new ArrayList<>(clientsMap.values());
 
         } catch (SQLException e) {
@@ -348,7 +347,6 @@ public class ClientDAO extends SocieteDAO {
                     }
 
                 }
-//                LOGGER.log(Level.INFO, "Client crée avec l'ID {0}", societeId);
                 return client;
             }
         } catch (SQLException e) {
