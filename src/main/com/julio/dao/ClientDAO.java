@@ -465,12 +465,10 @@ public class ClientDAO extends SocieteDAO {
             // ========== ÉTAPE 2 : Mettre à jour l'adresse ==========
             if (client.getAdresse() != null && client.getAdresse().getId() != null) {
                 adresseDAO.save(client.getAdresse(), connection);
-                LOGGER.log(Level.FINE, "Adresse mise à jour : ID={0}", client.getAdresse().getId());
             }
 
             // ========== ÉTAPE 3 : Mettre à jour la société ==========
             saveSociete(client, societeId, connection);
-            LOGGER.log(Level.FINE, "Société mise à jour : ID={0}", societeId);
 
             // ========== ÉTAPE 4 : Mettre à jour le client ==========
             String sql = "UPDATE client " +

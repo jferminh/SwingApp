@@ -323,132 +323,67 @@ public class AdresseDAO {
         }
     }
 
-
-
     /**
-     * Supprime une adresse de la base de données avec transaction.
+     * Supprime une adresse dans le contexte d'une transaction parent.
      * <p>
-     * ATTENTION : La suppression échouera si l'adresse est référencée par
-     * une ou plusieurs sociétés (clients ou prospects) en raison des
-     * contraintes de clé étrangère. Une exception FOREIGN_KEY_VIOLATION
-     * sera levée dans ce cas.
+     * <strong>IMPORTANT :</strong> Cette méthode participe à une transaction
+     * gérée par l'appelant (ClientDAO ou ProspectDAO). Elle NE DOIT PAS gérer
+     * commit/rollback ni fermer la connexion.
+     * </p>
      *
-     * @param id l'identifiant de l'adresse à supprimer
-     * @return true si la suppression a réussi, false sinon
+     * @param connection la connexion en transaction (non null)
+     * @param adresseId l'ID de l'adresse à supprimer
      * @throws DAOException si une erreur survient lors de la suppression
      */
-    public boolean deleteAdresse(Integer id) throws DAOException {
-        if (id == null || id <= 0) {
+    protected void deleteAdresse(Connection connection, Integer adresseId)
+            throws DAOException {
+
+        if (connection == null) {
             throw new DAOException(
                     DAOException.ErrorCode.INVALID_PARAMETER,
-                    "delete",
-                    id,
-                    "L'ID doit être un entier positif non null pour supprimer une adresse"
+                    "deleteAdresse",
+                    adresseId,
+                    "La connexion ne peut pas être null"
             );
         }
 
-        Connection conn = dbConnexion.getConnection();
-
-        try {
-            // Démarrer la transaction
-            conn.setAutoCommit(false);
-
-            // Supprimer l'adresse
-            String query2 = "DELETE FROM adresse WHERE id_adresse = ?";
-            try (PreparedStatement pstmt2 = conn.prepareStatement(query2)) {
-                pstmt2.setInt(1, id);
-
-                int rowsAffected = pstmt2.executeUpdate();
-
-                if (rowsAffected > 0) {
-                    conn.commit();
-                    return true;
-                } else {
-                    conn.rollback();
-                    return false;
-                }
-            }
-        } catch (SQLException e) {
-            try {
-                conn.rollback();
-                LOGGER.log(Level.SEVERE, "Erreur lors de la suppression, rollback effectué", e);
-            } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
-            }
-            LOGGER.log(Level.SEVERE, "Erreur SQL lors de la suppression de l'adresse ID= " + id, e);
-
-            // Analyse spécifique pour les violations de clés étrangères
-            if (SQLExceptionAnalyzer.isForeignKeyViolation(e)){
-                String constraintName = SQLExceptionAnalyzer.extractConstraintName(e);
-                throw new DAOException(
-                        DAOException.ErrorCode.FOREIGN_KEY_VIOLATION,
-                        "delete",
-                        id,
-                        "Impossible de supprimer l'adresse : elle est référencée par une ou plusieurs sociétés" +
-                                (constraintName == null ? "(contrainte: " + constraintName + ")" : ""),
-                        e
-                );
-            }
-            throw new DAOException(
-                    SQLExceptionAnalyzer.categorize(e),
-                    "delete",
-                    id,
-                    "Erreur lors de la suppression de l'adresse : " + SQLExceptionAnalyzer.analyze(e),
-                    e
-            );
-        } finally {
-            try {
-                conn.setAutoCommit(true);
-            } catch (SQLException e) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", e);
-            }
-        }
-    }
-
-    /**
-     * Supprime une adresse par son ID dans le contexte d'une transaction existante.
-     * <p>
-     * Cette méthode ne gère PAS les transactions.
-     * Elle doit être appelée UNIQUEMENT si l'adresse n'est plus référencée.
-     *
-     * @param connection
-     * @param adresseId  l'ID de l'adresse à supprimer
-     * @throws DAOException si une erreur survient lors de la suppression
-     */
-    public void deleteAdresse(Connection connection, Integer adresseId) throws DAOException {
         if (adresseId == null || adresseId <= 0) {
             throw new DAOException(
                     DAOException.ErrorCode.INVALID_PARAMETER,
-                    "deleteAdresseInTransaction",
+                    "deleteAdresse",
                     adresseId,
                     "L'ID adresse doit être un entier positif non null"
             );
         }
 
-        String deleteAdresseSQL = "DELETE FROM adresse WHERE id_adresse = ?";
+        String sql = "DELETE FROM adresse WHERE id_adresse = ?";
+        PreparedStatement pstmt = null;
 
-        try (PreparedStatement pstmt = dbConnexion.getConnection().prepareStatement(deleteAdresseSQL)) {
+        try {
+            pstmt = connection.prepareStatement(sql);
             pstmt.setInt(1, adresseId);
+
             int rowsAffected = pstmt.executeUpdate();
 
-            if (rowsAffected > 0) {
-                LOGGER.log(Level.INFO, "Adresse supprimée car non référencée : ID={0}", adresseId);
-            } else {
-                LOGGER.log(Level.WARNING, "Aucune adresse trouvée avec l'ID {0}", adresseId);
-                // Pas d'exception ici car ce n'est pas critique (adresse déjà supprimée)
+            if (rowsAffected <= 0) {
+                throw new DAOException(
+                        DAOException.ErrorCode.ENTITY_NOT_FOUND,
+                        "deleteAdresse",
+                        adresseId,
+                        "Aucune adresse trouvée avec l'ID " + adresseId
+                );
             }
 
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Erreur SQL lors de la suppression de l'adresse ID=" + adresseId, e);
 
-            // Analyse spécifique pour les violations de contraintes
             if (SQLExceptionAnalyzer.isForeignKeyViolation(e)) {
                 String constraintName = SQLExceptionAnalyzer.extractConstraintName(e);
                 throw new DAOException(
                         DAOException.ErrorCode.FOREIGN_KEY_VIOLATION,
-                        "deleteAdresseInTransaction",
+                        "deleteAdresse",
                         adresseId,
-                        "Impossible de supprimer l'adresse : elle est encore référencée par des sociétés" +
+                        "Impossible de supprimer l'adresse : elle est référencée par d'autres entités" +
                                 (constraintName != null ? " (contrainte: " + constraintName + ")" : ""),
                         e
                 );
@@ -456,14 +391,24 @@ public class AdresseDAO {
 
             throw new DAOException(
                     SQLExceptionAnalyzer.categorize(e),
-                    "deleteAdresseInTransaction",
+                    "deleteAdresse",
                     adresseId,
                     "Erreur lors de la suppression de l'adresse : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
+        } finally {
+            // ✅ IMPORTANT : Fermer SEULEMENT le PreparedStatement
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
+            }
+            // ❌ NE PAS fermer connection (Singleton)
+            // ❌ NE PAS gérer transaction (responsabilité de l'appelant)
         }
     }
-
 
     /**
      * Méthode utilitaire pour mapper un ResultSet vers un objet Adresse.
