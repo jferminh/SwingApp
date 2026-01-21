@@ -408,18 +408,17 @@ public class ClientDAO extends SocieteDAO {
 
 
     /**
-     * Met à jour un client existant dans la base de données avec transaction.
-     * <p>
-     * Met à jour :
-     * Les informations de la société (raison sociale, téléphone, email, etc.)
-     * Les informations spécifiques du client (chiffre d'affaires, nb employés)
-     * L'adresse associée
-     * <p>
-     * Note : Les contrats ne sont pas mis à jour par cette méthode.
-     * Utilisez ContratDAO.save() pour modifier les contrats.
+     * Met à jour un client existant dans la base de données.
+     *
+     * <p>Cette méthode effectue une transaction qui met à jour :</p>
+     * <ul>
+     *   <li>L'adresse (si elle existe et a un ID)</li>
+     *   <li>La société</li>
+     *   <li>Le client</li>
+     * </ul>
      *
      * @param client le client à mettre à jour (doit avoir un ID valide)
-     * @return true si la mise à jour a réussi, false sinon
+     * @return true si la mise à jour a réussi, false si le client n'existe pas
      * @throws DAOException si une erreur survient lors de la mise à jour
      */
     public boolean save(Client client) throws DAOException {
@@ -431,73 +430,88 @@ public class ClientDAO extends SocieteDAO {
                     "Le client doit avoir un ID valide"
             );
         }
-        Connection connection = dbConnexion.getConnection();
-        boolean originalAutoCommit = true;
+
+        Connection connection = null;
+        PreparedStatement pstmtGetSociete = null;
+        PreparedStatement pstmtUpdateClient = null;
+        ResultSet rs = null;
+
         try {
-            originalAutoCommit = connection.getAutoCommit();
-//            connection.setAutoCommit(false);
-            if (originalAutoCommit) {
-                connection.setAutoCommit(false);
-            }
-            // 1. Récupérer id_societe depuis la table client
+            // ✅ CORRECTION : Récupérer la connexion sans try-with-resources
+            connection = dbConnexion.getConnection();
+            connection.setAutoCommit(false);
+
+            // ========== ÉTAPE 1 : Récupérer id_societe ==========
             Integer societeId = null;
             String getSocieteIdSQL = "SELECT id_societe FROM client WHERE id_client = ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(getSocieteIdSQL)) {
-                pstmt.setInt(1, client.getId());
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    if (rs.next()) {
-                        societeId = rs.getInt("id_societe");
-                    } else {
-                        if (originalAutoCommit) {
-                            connection.rollback();
-                        }
-                        LOGGER.log(Level.WARNING, "Aucun client trouvé avec l'ID {0}", client.getId());
-                        return false;
-                    }
-                }
+
+            pstmtGetSociete = connection.prepareStatement(getSocieteIdSQL);
+            pstmtGetSociete.setInt(1, client.getId());
+            rs = pstmtGetSociete.executeQuery();
+
+            if (rs.next()) {
+                societeId = rs.getInt("id_societe");
+            } else {
+                connection.rollback();
+                return false;
             }
 
-            // 2. Mettre à jour la partie adresse
+            // Fermer le ResultSet et PreparedStatement
+            rs.close();
+            rs = null;
+            pstmtGetSociete.close();
+            pstmtGetSociete = null;
+
+            // ========== ÉTAPE 2 : Mettre à jour l'adresse ==========
             if (client.getAdresse() != null && client.getAdresse().getId() != null) {
                 adresseDAO.save(client.getAdresse(), connection);
+                LOGGER.log(Level.FINE, "Adresse mise à jour : ID={0}", client.getAdresse().getId());
             }
-            // 3. Mettre à jour la partie société
+
+            // ========== ÉTAPE 3 : Mettre à jour la société ==========
             saveSociete(client, societeId, connection);
+            LOGGER.log(Level.FINE, "Société mise à jour : ID={0}", societeId);
 
-            String query = "UPDATE client " +
-                    "SET chiffre_affaires = ?, " +
-                    "nb_employes = ? " +
+            // ========== ÉTAPE 4 : Mettre à jour le client ==========
+            String sql = "UPDATE client " +
+                    "SET chiffre_affaires = ?, nb_employes = ? " +
                     "WHERE id_client = ?";
-            try (PreparedStatement statement = connection.prepareStatement(query)) {
-                statement.setLong(1, client.getChiffreAffaires());
-                statement.setInt(2, client.getNbEmployes());
-                statement.setInt(3, client.getId());
 
-                int rowsAffected = statement.executeUpdate();
-                if (rowsAffected > 0) {
-                    if (!connection.getAutoCommit()) {
-                        connection.commit();
-                    }
-                    return true;
-                } else {
-                    if (!connection.getAutoCommit()) {
-                        connection.rollback();
-                    }
-                    return false;
-                }
+            pstmtUpdateClient = connection.prepareStatement(sql);
+            pstmtUpdateClient.setLong(1, client.getChiffreAffaires());
+            pstmtUpdateClient.setInt(2, client.getNbEmployes());
+            pstmtUpdateClient.setInt(3, client.getId());
+
+            int rowsAffected = pstmtUpdateClient.executeUpdate();
+
+            if (rowsAffected > 0) {
+                // ✅ COMMIT : Transaction réussie
+                connection.commit();
+
+                LOGGER.log(Level.INFO,
+                        "Client mis à jour avec succès : ID={0}, Raison sociale={1}, CA={2}, Nb employés={3}",
+                        new Object[]{client.getId(), client.getRaisonSociale(),
+                                client.getChiffreAffaires(), client.getNbEmployes()});
+
+                return true;
+            } else {
+                connection.rollback();
+                LOGGER.log(Level.WARNING, "Aucune ligne mise à jour pour le client ID={0}", client.getId());
+                return false;
             }
+
         } catch (SQLException e) {
-            try {
-                if (!connection.getAutoCommit()) {
+            // ✅ ROLLBACK en cas d'erreur SQL
+            if (connection != null) {
+                try {
                     connection.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur SQL", e);
+                } catch (SQLException rollbackEx) {
+                    LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
                 }
-                LOGGER.log(Level.WARNING, "Erreur lors de la mis à jour, rollback effectué", e);
-
-            } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
             }
 
-            LOGGER.log(Level.SEVERE, "Erreur lors de la mise à jour du client ID= " + client.getId(), e);
+            LOGGER.log(Level.SEVERE, "Erreur SQL lors de la mise à jour du client ID=" + client.getId(), e);
             throw new DAOException(
                     SQLExceptionAnalyzer.categorize(e),
                     "save",
@@ -505,47 +519,73 @@ public class ClientDAO extends SocieteDAO {
                     "Erreur lors de la mise à jour du client : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
-        } catch(DAOException e) {
-            try {
-                if (!connection.getAutoCommit()) {
+
+        } catch (DAOException e) {
+            // ✅ ROLLBACK en cas d'erreur DAO
+            if (connection != null) {
+                try {
                     connection.rollback();
                     LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur DAO", e);
+                } catch (SQLException rollbackEx) {
+                    LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
                 }
-            } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
             }
             throw e;
+
         } finally {
-            try {
-                if (originalAutoCommit && !connection.getAutoCommit()) {
-                    connection.setAutoCommit(true);
+            // ✅ IMPORTANT : Fermer toutes les ressources
+            if (rs != null) {
+                try {
+                    rs.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
                 }
-            } catch (SQLException e) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", e);
             }
+
+            if (pstmtGetSociete != null) {
+                try {
+                    pstmtGetSociete.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement getSociete", e);
+                }
+            }
+
+            if (pstmtUpdateClient != null) {
+                try {
+                    pstmtUpdateClient.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement updateClient", e);
+                }
+            }
+
+            // ✅ CRUCIAL : Réactiver autoCommit
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
+                }
+            }
+
+            // ❌ NE PAS FERMER connection (Singleton)
         }
     }
 
     /**
-     * Supprime un client de la base de données avec transaction.
+     * Supprime un client de la base de données.
      *
-     * <p><strong>⚠️ IMPORTANT :</strong> Cette méthode refuse de supprimer un client
-     * qui possède des contrats associés. Les contrats doivent être supprimés
-     * manuellement au préalable.</p>
-     *
-     * <p><strong>Étapes :</strong></p>
+     * <p>Cette méthode effectue une transaction qui :</p>
      * <ol>
-     *   <li>Vérifier l'existence du client</li>
-     *   <li>Vérifier qu'il n'a AUCUN contrat associé</li>
-     *   <li>Supprimer le client de la table {@code client}</li>
-     *   <li>Supprimer la société de la table {@code societe}</li>
-     *   <li>Supprimer l'adresse si non référencée par d'autres sociétés</li>
-     *   <li>Commit de la transaction</li>
+     *   <li>Vérifie que le client existe</li>
+     *   <li>Vérifie qu'il n'a pas de contrats (sinon erreur)</li>
+     *   <li>Supprime le client</li>
+     *   <li>Supprime la société associée</li>
+     *   <li>Supprime l'adresse si elle n'est plus référencée</li>
      * </ol>
      *
-     * @param id l'identifiant du client à supprimer
+     * @param id l'ID du client à supprimer
      * @return true si la suppression a réussi, false si le client n'existe pas
-     * @throws DAOException si une erreur survient ou si le client possède des contrats
+     * @throws DAOException si une erreur survient ou si le client a des contrats
      */
     public boolean delete(Integer id) throws DAOException {
         if (id == null || id <= 0) {
@@ -558,33 +598,46 @@ public class ClientDAO extends SocieteDAO {
         }
 
         Connection connection = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
         Integer societeId = null;
         Integer adresseId = null;
 
         try {
+            // ✅ CORRECTION : Récupérer la connexion sans try-with-resources
             connection = dbConnexion.getConnection();
             connection.setAutoCommit(false);
 
-            // ========== ÉTAPE 1 : VÉRIFIER L'EXISTENCE DU CLIENT ==========
+            LOGGER.log(Level.FINE, "Début transaction suppression client : ID={0}", id);
+
+            // ========== ÉTAPE 1 : Récupérer id_societe et adresse_id ==========
             String getIdsSQL = "SELECT c.id_societe, s.adresse_id " +
                     "FROM client c " +
                     "INNER JOIN societe s ON c.id_societe = s.id_societe " +
                     "WHERE c.id_client = ?";
 
-            try (PreparedStatement statement = connection.prepareStatement(getIdsSQL)) {
-                statement.setInt(1, id);
-                try (ResultSet rs = statement.executeQuery()) {
-                    if (rs.next()) {
-                        societeId = rs.getInt("id_societe");
-                        adresseId = rs.getInt("adresse_id");
-                    } else {
-                        connection.rollback();
-                        return false;
-                    }
-                }
+            pstmt = connection.prepareStatement(getIdsSQL);
+            pstmt.setInt(1, id);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                societeId = rs.getInt("id_societe");
+                adresseId = rs.getInt("adresse_id");
+                LOGGER.log(Level.FINE, "Client trouvé : société ID={0}, adresse ID={1}",
+                        new Object[]{societeId, adresseId});
+            } else {
+                connection.rollback();
+                LOGGER.log(Level.WARNING, "Aucun client trouvé avec l'ID {0}", id);
+                return false;
             }
 
-            // ========== ÉTAPE 2 : VÉRIFIER QU'IL N'A PAS DE CONTRATS ==========
+            // Fermer rs et pstmt
+            rs.close();
+            rs = null;
+            pstmt.close();
+            pstmt = null;
+
+            // ========== ÉTAPE 2 : Vérifier qu'il n'a pas de contrats ==========
             int nbContrats = countContratsByClientId(connection, id);
 
             if (nbContrats > 0) {
@@ -599,44 +652,51 @@ public class ClientDAO extends SocieteDAO {
                         "delete",
                         id,
                         String.format(
-                                "Impossible de supprimer le client : %d contrat(s) associé(s) trouvé(s). " +
+                                "Impossible de supprimer le client : %d contrat(s) associé(s). " +
                                         "Veuillez d'abord supprimer les contrats.",
                                 nbContrats
                         )
                 );
             }
 
-            // ========== ÉTAPE 3 : SUPPRIMER LE CLIENT ==========
+            LOGGER.log(Level.FINE, "Client sans contrats, suppression autorisée");
+
+            // ========== ÉTAPE 3 : Supprimer le client ==========
             String deleteClientSQL = "DELETE FROM client WHERE id_client = ?";
-            try (PreparedStatement statement = connection.prepareStatement(deleteClientSQL)) {
-                statement.setInt(1, id);
-                int rowsAffected = statement.executeUpdate();
+            pstmt = connection.prepareStatement(deleteClientSQL);
+            pstmt.setInt(1, id);
 
-                if (rowsAffected == 0) {
-                    throw new SQLException("Aucune ligne supprimée dans la table client pour ID=" + id);
-                }
+            int rowsAffected = pstmt.executeUpdate();
 
+            if (rowsAffected == 0) {
+                throw new SQLException("Aucune ligne supprimée dans la table client pour ID=" + id);
             }
 
-            // ========== ÉTAPE 4 : SUPPRIMER LA SOCIÉTÉ ==========
-            deleteSocieteInTransaction(connection, societeId);
+            LOGGER.log(Level.FINE, "Client supprimé : ID={0}", id);
 
-            // ========== ÉTAPE 5 : VÉRIFIER SI L'ADRESSE EST RÉFÉRENCÉE ==========
+            pstmt.close();
+            pstmt = null;
+
+            // ========== ÉTAPE 4 : Supprimer la société ==========
+            deleteSociete(connection, societeId);
+            LOGGER.log(Level.FINE, "Société supprimée : ID={0}", societeId);
+
+            // ========== ÉTAPE 5 : Vérifier si l'adresse est référencée ==========
             boolean adresseEstReferenciee = isAdresseReferencee(connection, adresseId);
 
             if (adresseEstReferenciee) {
                 LOGGER.log(Level.INFO,
-                        "Adresse conservée car référencée par d''autres sociétés : ID={0}",
+                        "Adresse conservée car référencée par d'autres sociétés : ID={0}",
                         adresseId);
             } else {
                 // Supprimer l'adresse si elle n'est plus référencée
                 try {
-                    deleteAdresseInTransaction(connection, adresseId);
-                    LOGGER.log(Level.INFO, "Adresse supprimée : ID={0}", adresseId);
+                    adresseDAO.deleteAdresse(connection, adresseId);
+                    LOGGER.log(Level.FINE, "Adresse supprimée : ID={0}", adresseId);
                 } catch (DAOException e) {
                     // Si la suppression échoue, on log mais on continue
                     LOGGER.log(Level.WARNING,
-                            "Impossible de supprimer l''adresse ID={0} : {1}",
+                            "Impossible de supprimer l'adresse ID={0} : {1}",
                             new Object[]{adresseId, e.getMessage()});
                 }
             }
@@ -655,10 +715,17 @@ public class ClientDAO extends SocieteDAO {
             return true;
 
         } catch (SQLException e) {
-            rollback(connection, "delete", id);
+            // ✅ ROLLBACK en cas d'erreur SQL
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur SQL", e);
+                } catch (SQLException rollbackEx) {
+                    LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+                }
+            }
 
             LOGGER.log(Level.SEVERE, "Erreur SQL lors de la suppression du client ID=" + id, e);
-
             throw new DAOException(
                     SQLExceptionAnalyzer.categorize(e),
                     "delete",
@@ -666,10 +733,50 @@ public class ClientDAO extends SocieteDAO {
                     "Erreur lors de la suppression du client : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
+
+        } catch (DAOException e) {
+            // ✅ ROLLBACK en cas d'erreur DAO
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur DAO", e);
+                } catch (SQLException rollbackEx) {
+                    LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+                }
+            }
+            throw e;
+
         } finally {
-            resetAutoCommit(connection);
+            // ✅ IMPORTANT : Fermer toutes les ressources
+            if (rs != null) {
+                try {
+                    rs.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
+                }
+            }
+
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
+            }
+
+            // ✅ CRUCIAL : Réactiver autoCommit
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
+                }
+            }
+
+            // ❌ NE PAS FERMER connection (Singleton)
         }
     }
+
 
 // ========== MÉTHODES PRIVÉES UTILITAIRES ==========
 

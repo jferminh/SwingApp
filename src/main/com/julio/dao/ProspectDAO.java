@@ -340,23 +340,22 @@ public class ProspectDAO extends SocieteDAO {
         }
     }
 
-
-
     /**
-     * Met à jour un prospect existant dans la base de données avec transaction.
-     * <p>
-     * Met à jour :
-     * Les informations de la société (raison sociale, téléphone, email, etc.)
-     * Les informations spécifiques du prospect (date prospection, intéressé)
-     * L'adresse associée
+     * Met à jour un prospect existant dans la base de données.
+     *
+     * <p>Cette méthode effectue une transaction qui met à jour :</p>
+     * <ul>
+     *   <li>L'adresse (si elle existe et a un ID)</li>
+     *   <li>La société</li>
+     *   <li>Le prospect</li>
+     * </ul>
      *
      * @param prospect le prospect à mettre à jour (doit avoir un ID valide)
-     * @return true si la mise à jour a réussi, false sinon
+     * @return true si la mise à jour a réussi, false si le prospect n'existe pas
      * @throws DAOException si une erreur survient lors de la mise à jour
      */
     public boolean save(Prospect prospect) throws DAOException {
         if (prospect == null || prospect.getId() == null || prospect.getId() <= 0) {
-            LOGGER.log(Level.WARNING, "Tentative de save avec un prospect invalide : {0}", prospect);
             throw new DAOException(
                     DAOException.ErrorCode.INVALID_PARAMETER,
                     "save",
@@ -365,77 +364,75 @@ public class ProspectDAO extends SocieteDAO {
             );
         }
 
-        Connection conn = dbConnexion.getConnection();
-        boolean originalAutoCommit = true;
+        Connection connection = null;
+        PreparedStatement pstmtGetSociete = null;
+        PreparedStatement pstmtUpdateProspect = null;
+        ResultSet rs = null;
 
         try {
-            originalAutoCommit = conn.getAutoCommit();
+            // ✅ CORRECTION : Récupérer la connexion sans try-with-resources
+            connection = dbConnexion.getConnection();
+            connection.setAutoCommit(false);
 
-            if (originalAutoCommit) {
-                conn.setAutoCommit(false);
-            }
-            // Récupérer id_societe depuis la table prospect
+            // ========== ÉTAPE 1 : Récupérer id_societe ==========
             Integer societeId = null;
             String getSocieteIdSQL = "SELECT id_societe FROM prospect WHERE id_prospect = ?";
-            try (PreparedStatement pstmt = conn.prepareStatement(getSocieteIdSQL)) {
-                pstmt.setInt(1, prospect.getId());
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    if (rs.next()) {
-                        societeId = rs.getInt("id_societe");
-                    } else {
-                        if (originalAutoCommit) {
-                            conn.rollback();
-                        }
-                        LOGGER.log(Level.WARNING, "Aucun prospect trouvé avec l'ID {0}", prospect.getId());
-                        return false;
-                    }
-                }
+
+            pstmtGetSociete = connection.prepareStatement(getSocieteIdSQL);
+            pstmtGetSociete.setInt(1, prospect.getId());
+            rs = pstmtGetSociete.executeQuery();
+
+            if (rs.next()) {
+                societeId = rs.getInt("id_societe");
+            } else {
+                connection.rollback();
+                return false;
             }
 
-            // Metre à jour l'adresse
+            // Fermer rs et pstmt
+            rs.close();
+            rs = null;
+            pstmtGetSociete.close();
+            pstmtGetSociete = null;
+
+            // ========== ÉTAPE 2 : Mettre à jour l'adresse ==========
             if (prospect.getAdresse() != null && prospect.getAdresse().getId() != null) {
-                adresseDAO.save(prospect.getAdresse(), conn);
+                adresseDAO.save(prospect.getAdresse(), connection);
             }
 
-            // Mettre à jour la partie société
-            saveSociete(prospect, societeId, conn);
+            // ========== ÉTAPE 3 : Mettre à jour la société ==========
+            saveSociete(prospect, societeId, connection);
 
-            // Mettre à jour la partie prospect
-            String sql = "UPDATE prospect SET date_prospection = ?, interesse = ? WHERE id_prospect = ?";
+            // ========== ÉTAPE 4 : Mettre à jour le prospect ==========
+            String sql = "UPDATE prospect " +
+                    "SET date_prospection = ?, interesse = ? " +
+                    "WHERE id_prospect = ?";
 
-            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setDate(1, Date.valueOf(prospect.getDateProspection()));
-                pstmt.setInt(2, prospect.getInteresse().toInt());
-                pstmt.setInt(3, prospect.getId());
+            pstmtUpdateProspect = connection.prepareStatement(sql);
+            pstmtUpdateProspect.setDate(1, Date.valueOf(prospect.getDateProspection()));
+            pstmtUpdateProspect.setInt(2, prospect.getInteresse().toInt());
+            pstmtUpdateProspect.setInt(3, prospect.getId());
 
-                int rowsAffected = pstmt.executeUpdate();
+            int rowsAffected = pstmtUpdateProspect.executeUpdate();
 
-                if (rowsAffected > 0) {
-                    if (!conn.getAutoCommit()) {
-                        conn.commit();
-                        LOGGER.log(Level.INFO,
-                                "Prospect mis à jour avec succès : ID prospect={0}, ID société={1}, Date={2}, Intéressé={3}",
-                                new Object[]{prospect.getId(), societeId, prospect.getDateProspection(), prospect.getInteresse()});
-                    }
-                    return true;
-                } else {
-                    if (!conn.getAutoCommit()) {
-                        conn.rollback();
-                    }
-                    LOGGER.log(Level.WARNING, "Aucun prospect trouvé avec l'ID {0} pour la mise à jour",
-                            prospect.getId());
-                    return false;
-                }
+            if (rowsAffected > 0) {
+                // ✅ COMMIT : Transaction réussie
+                connection.commit();
+                return true;
+            } else {
+                connection.rollback();
+                return false;
             }
 
         } catch (SQLException e) {
-            try {
-                if (!conn.getAutoCommit()) {
-                    conn.rollback();
-                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur de mise à jour", e);
+            // ✅ ROLLBACK en cas d'erreur SQL
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur SQL", e);
+                } catch (SQLException rollbackEx) {
+                    LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
                 }
-            } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
             }
 
             LOGGER.log(Level.SEVERE, "Erreur SQL lors de la mise à jour du prospect ID=" + prospect.getId(), e);
@@ -446,42 +443,71 @@ public class ProspectDAO extends SocieteDAO {
                     "Erreur lors de la mise à jour du prospect : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
+
         } catch (DAOException e) {
-            try {
-                if (!conn.getAutoCommit()) {
-                    conn.rollback();
+            // ✅ ROLLBACK en cas d'erreur DAO
+            if (connection != null) {
+                try {
+                    connection.rollback();
                     LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur DAO", e);
+                } catch (SQLException rollbackEx) {
+                    LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
                 }
-            } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
             }
             throw e;
+
         } finally {
-            try {
-                if (originalAutoCommit && !conn.getAutoCommit()) {
-                    conn.setAutoCommit(true);
+            // ✅ IMPORTANT : Fermer toutes les ressources
+            if (rs != null) {
+                try {
+                    rs.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
                 }
-            } catch (SQLException e) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", e);
             }
+
+            if (pstmtGetSociete != null) {
+                try {
+                    pstmtGetSociete.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement getSociete", e);
+                }
+            }
+
+            if (pstmtUpdateProspect != null) {
+                try {
+                    pstmtUpdateProspect.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement updateProspect", e);
+                }
+            }
+
+            // ✅ CRUCIAL : Réactiver autoCommit
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
+                }
+            }
+
+            // ❌ NE PAS FERMER connection (Singleton)
         }
     }
 
     /**
-     * Supprime un prospect de la base de données avec transaction.
-     * <p>
-     * Processus de suppression en respectant les FK :
-     * 1. Récupère id_societe et adresse_id
-     * 2. Supprime l'enregistrement prospect (table prospect)
-     * 3. Supprime l'enregistrement société (table societe) via SocieteDAO
-     * 4. Vérifie si l'adresse est référencée par d'autres sociétés
-     * 5. Si l'adresse n'est plus référencée, la supprime via AdresseDAO
-     * <p>
-     * Note : Si la suppression échoue à n'importe quelle étape,
-     * toute la transaction est annulée (rollback).
+     * Supprime un prospect de la base de données.
      *
-     * @param id l'identifiant du prospect (id dans la table prospect)
-     * @return true si la suppression a réussi, false sinon
+     * <p>Cette méthode effectue une transaction qui :</p>
+     * <ol>
+     *   <li>Vérifie que le prospect existe</li>
+     *   <li>Supprime le prospect</li>
+     *   <li>Supprime la société associée</li>
+     *   <li>Supprime l'adresse si elle n'est plus référencée</li>
+     * </ol>
+     *
+     * @param id l'ID du prospect à supprimer
+     * @return true si la suppression a réussi, false si le prospect n'existe pas
      * @throws DAOException si une erreur survient lors de la suppression
      */
     public boolean delete(Integer id) throws DAOException {
@@ -494,78 +520,89 @@ public class ProspectDAO extends SocieteDAO {
             );
         }
 
-        LOGGER.log(Level.INFO, "Début de la suppression du prospect ID={0}", id);
-
-        Connection conn = dbConnexion.getConnection();
+        Connection connection = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
         Integer societeId = null;
         Integer adresseId = null;
 
         try {
-            conn.setAutoCommit(false);
+            // ✅ CORRECTION : Récupérer la connexion sans try-with-resources
+            connection = dbConnexion.getConnection();
+            connection.setAutoCommit(false);
 
-            // 1. RÉCUPÉRER id_societe ET adresse_id
+            // ========== ÉTAPE 1 : Récupérer id_societe et adresse_id ==========
             String getIdsSQL = "SELECT p.id_societe, s.adresse_id " +
                     "FROM prospect p " +
                     "INNER JOIN societe s ON p.id_societe = s.id_societe " +
                     "WHERE p.id_prospect = ?";
 
-            try (PreparedStatement pstmt = conn.prepareStatement(getIdsSQL)) {
-                pstmt.setInt(1, id);
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    if (rs.next()) {
-                        societeId = rs.getInt("id_societe");
-                        adresseId = rs.getInt("adresse_id");
-                    } else {
-                        conn.rollback();
-                        LOGGER.log(Level.WARNING, "Aucun prospect trouvé avec l'ID {0}", id);
-                        return false;
-                    }
-                }
+            pstmt = connection.prepareStatement(getIdsSQL);
+            pstmt.setInt(1, id);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                societeId = rs.getInt("id_societe");
+                adresseId = rs.getInt("adresse_id");
+            } else {
+                connection.rollback();
+                return false;
             }
 
-            // 2. SUPPRIMER L'ENREGISTREMENT PROSPECT
+            // Fermer rs et pstmt
+            rs.close();
+            rs = null;
+            pstmt.close();
+            pstmt = null;
+
+            // ========== ÉTAPE 2 : Supprimer le prospect ==========
             String deleteProspectSQL = "DELETE FROM prospect WHERE id_prospect = ?";
-            try (PreparedStatement pstmt = conn.prepareStatement(deleteProspectSQL)) {
-                pstmt.setInt(1, id);
-                int rowsAffected = pstmt.executeUpdate();
-                LOGGER.log(Level.FINE, "Enregistrement prospect supprimé : ID={0}", id);
+            pstmt = connection.prepareStatement(deleteProspectSQL);
+            pstmt.setInt(1, id);
+
+            int rowsAffected = pstmt.executeUpdate();
+
+            if (rowsAffected == 0) {
+                throw new SQLException("Aucune ligne supprimée dans la table prospect pour ID=" + id);
             }
 
-            // 3. SUPPRIMER L'ENREGISTREMENT SOCIÉTÉ (via SocieteDAO)
-            try {
-                deleteSocieteInTransaction(societeId);
-                LOGGER.log(Level.FINE, "Enregistrement société supprimé via SocieteDAO : ID={0}", societeId);
-            } catch (DAOException e) {
-                // Propager l'exception pour déclencher le rollback
-                throw e;
-            }
+            pstmt.close();
+            pstmt = null;
 
-            // 4. VÉRIFIER SI L'ADRESSE EST RÉFÉRENCÉE PAR D'AUTRES SOCIÉTÉS
+            // ========== ÉTAPE 3 : Supprimer la société ==========
+            this.deleteSociete(connection, societeId);
+            LOGGER.log(Level.FINE, "Société supprimée : ID={0}", societeId);
+
+            // ========== ÉTAPE 4 : Vérifier si l'adresse est référencée ==========
             boolean adresseEstReferenciee = false;
+
             if (adresseId != null) {
                 String checkAdresseSQL = "SELECT COUNT(*) AS nb FROM societe WHERE adresse_id = ?";
-                try (PreparedStatement pstmt = conn.prepareStatement(checkAdresseSQL)) {
-                    pstmt.setInt(1, adresseId);
-                    try (ResultSet rs = pstmt.executeQuery()) {
-                        if (rs.next()) {
-                            int nbReferences = rs.getInt("nb");
-                            adresseEstReferenciee = (nbReferences > 0);
-                            LOGGER.log(Level.FINE,
-                                    "Adresse ID={0} : {1} référence(s) trouvée(s)",
-                                    new Object[]{adresseId, nbReferences});
-                        }
-                    }
+                pstmt = connection.prepareStatement(checkAdresseSQL);
+                pstmt.setInt(1, adresseId);
+                rs = pstmt.executeQuery();
+
+                if (rs.next()) {
+                    int nbReferences = rs.getInt("nb");
+                    adresseEstReferenciee = (nbReferences > 0);
+                    LOGGER.log(Level.FINE,
+                            "Adresse ID={0} : {1} référence(s) trouvée(s)",
+                            new Object[]{adresseId, nbReferences});
                 }
+
+                rs.close();
+                rs = null;
+                pstmt.close();
+                pstmt = null;
             }
 
-            // 5. SUPPRIMER L'ADRESSE SI ELLE N'EST PLUS RÉFÉRENCÉE (via AdresseDAO)
+            // ========== ÉTAPE 5 : Supprimer l'adresse si elle n'est plus référencée ==========
             if (adresseId != null && !adresseEstReferenciee) {
                 try {
-                    adresseDAO.deleteAdresseInTransaction(adresseId);
-                    LOGGER.log(Level.FINE, "Adresse supprimée via AdresseDAO : ID={0}", adresseId);
+                    adresseDAO.deleteAdresse(connection, adresseId);
+                    LOGGER.log(Level.FINE, "Adresse supprimée : ID={0}", adresseId);
                 } catch (DAOException e) {
-                    // Si l'adresse ne peut pas être supprimée (FK), on continue quand même
-                    // car la suppression du prospect a réussi
+                    // Si l'adresse ne peut pas être supprimée, on log mais on continue
                     LOGGER.log(Level.WARNING,
                             "Impossible de supprimer l'adresse ID={0} : {1}",
                             new Object[]{adresseId, e.getMessage()});
@@ -575,7 +612,9 @@ public class ProspectDAO extends SocieteDAO {
                         "Adresse conservée car référencée par d'autres sociétés : ID={0}", adresseId);
             }
 
-            conn.commit();
+            // ========== COMMIT ==========
+            connection.commit();
+
             LOGGER.log(Level.INFO,
                     "Prospect supprimé avec succès : ID prospect={0}, ID société={1}, Adresse {2}",
                     new Object[]{id, societeId,
@@ -584,15 +623,19 @@ public class ProspectDAO extends SocieteDAO {
             return true;
 
         } catch (SQLException e) {
-            try {
-                conn.rollback();
-                LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur de suppression", e);
-            } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+            // ✅ ROLLBACK en cas d'erreur SQL
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur SQL", e);
+                } catch (SQLException rollbackEx) {
+                    LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+                }
             }
 
             LOGGER.log(Level.SEVERE, "Erreur SQL lors de la suppression du prospect ID=" + id, e);
 
+            // Vérifier si c'est une violation de clé étrangère
             if (SQLExceptionAnalyzer.isForeignKeyViolation(e)) {
                 String constraintName = SQLExceptionAnalyzer.extractConstraintName(e);
                 throw new DAOException(
@@ -612,20 +655,47 @@ public class ProspectDAO extends SocieteDAO {
                     "Erreur lors de la suppression du prospect : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
+
         } catch (DAOException e) {
-            try {
-                conn.rollback();
-                LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur DAO", e);
-            } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+            // ✅ ROLLBACK en cas d'erreur DAO
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                    LOGGER.log(Level.WARNING, "Rollback effectué suite à l'erreur DAO", e);
+                } catch (SQLException rollbackEx) {
+                    LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
+                }
             }
             throw e;
+
         } finally {
-            try {
-                conn.setAutoCommit(true);
-            } catch (SQLException e) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", e);
+            // ✅ IMPORTANT : Fermer toutes les ressources
+            if (rs != null) {
+                try {
+                    rs.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
+                }
             }
+
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
+            }
+
+            // ✅ CRUCIAL : Réactiver autoCommit
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur réactivation autoCommit", e);
+                }
+            }
+
+            // ❌ NE PAS FERMER connection (Singleton)
         }
     }
 
