@@ -66,7 +66,6 @@ public class ClientDAO extends SocieteDAO {
                 "LEFT JOIN contrat ct ON c.id_client = ct.client_id " +
                 "ORDER BY s.raison_sociale ASC";
 
-        // ✅ SOLUTION : Ne PAS utiliser try-with-resources sur la connexion
         PreparedStatement pstmt = null;
         ResultSet rs = null;
 
@@ -146,11 +145,14 @@ public class ClientDAO extends SocieteDAO {
 
 
     /**
-     * Récupère un client par son identifiant.
+     * Recherche un client par son identifiant avec ses contrats.
      *
-     * @param id l'identifiant du client
-     * @return le client correspondant ou null si non trouvé
-     * @throws DAOException si une erreur survient lors de la requête
+     * <p>Cette méthode utilise un LEFT JOIN pour récupérer le client et ses contrats
+     * en une seule requête SQL (optimisation N+1).</p>
+     *
+     * @param id l'identifiant du client à rechercher
+     * @return le client trouvé avec ses contrats, ou null si aucun client ne correspond
+     * @throws DAOException si une erreur survient lors de la recherche
      */
     public Client findById(Integer id) throws DAOException {
         if (id == null || id <= 0) {
@@ -158,41 +160,89 @@ public class ClientDAO extends SocieteDAO {
                     DAOException.ErrorCode.INVALID_PARAMETER,
                     "findById",
                     id,
-                    "L'ID doit être une entier positif non null"
+                    "L'ID doit être un entier positif non null"
             );
         }
 
-        String query = "SELECT s.id_societe, s.raison_sociale, s.adresse_id, s.telephone, " +
-                "s.email, s.commentaires, " +
-                "c.id_client, c.chiffre_affaires, c.nb_employes, " +
-                "a.numero_rue, a.nom_rue, a.code_postal, a.ville " +
+        String sql = "SELECT " +
+                "    s.id_societe, s.raison_sociale, s.adresse_id, " +
+                "    s.telephone, s.email, s.commentaires, " +
+                "    c.id_client, c.chiffre_affaires, c.nb_employes, " +
+                "    a.numero_rue, a.nom_rue, a.code_postal, a.ville, " +
+                "    ct.id_contrat, ct.nom_contrat, ct.montant " +
                 "FROM societe s " +
                 "INNER JOIN client c ON s.id_societe = c.id_societe " +
                 "INNER JOIN adresse a ON s.adresse_id = a.id_adresse " +
+                "LEFT JOIN contrat ct ON c.id_client = ct.client_id " +
                 "WHERE c.id_client = ?";
 
-        try (PreparedStatement statement = dbConnexion.getConnection().prepareStatement(query)) {
-            statement.setInt(1, id);
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        Client client = null;
 
-            try (ResultSet rs = statement.executeQuery()) {
-                if (rs.next()) {
-                    Client client = mapResultSetToClient(rs);
+        try {
+            // ✅ CORRECTION : Ne pas utiliser try-with-resources sur la connexion
+            Connection conn = dbConnexion.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, id);
+            rs = pstmt.executeQuery();
 
-                    // Charger les contrats du client
+            while (rs.next()) {
+                // ========== ÉTAPE 1 : CRÉER LE CLIENT (une seule fois) ==========
+                if (client == null) {
                     try {
-                        List<Contrat> contrats = contratDAO.findByIdClient(client.getId());
-                        for (Contrat contrat : contrats) {
-                            client.ajouterContrat(contrat);
-                        }
-                    } catch (DAOException e) {
-                        LOGGER.log(Level.WARNING,
-                                "Impossible de charger les contrats du client ID={0}", client.getId());
+                        client = mapResultSetToClient(rs);
+
+                    } catch (ValidationException e) {
+                        LOGGER.log(Level.SEVERE,
+                                "Erreur de validation lors du mapping du client ID={0}", id);
+                        throw new DAOException(
+                                DAOException.ErrorCode.INVALID_PARAMETER,
+                                "findById",
+                                id,
+                                "Données invalides pour le client : " + e.getMessage(),
+                                e
+                        );
                     }
-                    return client;
-                } else {
-                    return null;
+                }
+
+                // ========== ÉTAPE 2 : AJOUTER LE CONTRAT SI PRÉSENT ==========
+                Integer contratId = rs.getInt("id_contrat");
+
+                // Vérifier si un contrat existe (LEFT JOIN peut retourner NULL)
+                if (!rs.wasNull() && contratId != null && contratId > 0) {
+                    try {
+                        String nomContrat = rs.getString("nom_contrat");
+                        double montant = rs.getDouble("montant");
+
+                        Contrat contrat = new Contrat(id, nomContrat, montant);
+                        contrat.setId(contratId);
+
+                        // Éviter les doublons
+                        if (!client.getContrats().contains(contrat)) {
+                            client.ajouterContrat(contrat);
+
+                        }
+
+                    } catch (ValidationException e) {
+                        LOGGER.log(Level.WARNING,
+                                "Contrat invalide ignoré pour le client ID={0} : {1}",
+                                new Object[]{id, e.getMessage()});
+                        // On continue sans bloquer le chargement du client
+                    }
                 }
             }
+
+            if (client != null) {
+                LOGGER.log(Level.INFO,
+                        "Client ID={0} récupéré avec {1} contrat(s)",
+                        new Object[]{id, client.getContrats().size()});
+            } else {
+                LOGGER.log(Level.FINE, "Aucun client trouvé avec l''ID {0}", id);
+            }
+
+            return client;
+
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Erreur SQL lors de findById avec ID=" + id, e);
             throw new DAOException(
@@ -202,17 +252,26 @@ public class ClientDAO extends SocieteDAO {
                     "Erreur lors de la recherche du client : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
-        } catch (ValidationException ex) {
-            LOGGER.log(Level.SEVERE, "Erreur de validation lors du mapping", ex);
-            throw new DAOException(
-                    DAOException.ErrorCode.READ_ERROR,
-                    "findById",
-                    id,
-                    "Erreur de validation des données : " + ex.getMessage(),
-                    ex
-            );
+        } finally {
+            // ✅ IMPORTANT : Fermer SEULEMENT ResultSet et PreparedStatement
+            // NE PAS FERMER la connexion (gérée par Singleton)
+            if (rs != null) {
+                try {
+                    rs.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur lors de la fermeture du ResultSet", e);
+                }
+            }
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur lors de la fermeture du PreparedStatement", e);
+                }
+            }
         }
     }
+
 
     /**
      * Insère un nouveau client dans la base de données avec transaction.

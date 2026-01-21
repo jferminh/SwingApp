@@ -3,6 +3,8 @@ package main.com.julio.model;
 import main.com.julio.exception.ValidationException;
 import main.com.julio.service.ValidationService;
 
+import java.util.Objects;
+
 /**
  * Classe représentant un contrat commercial dans le système de gestion.
  * <p>
@@ -134,5 +136,18 @@ public class Contrat {
      */
     public String toString() {
         return nomContrat + " (" + montant + "€)";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Contrat)) return false;
+        Contrat contrat = (Contrat) o;
+        return Objects.equals(id, contrat.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
     }
 }

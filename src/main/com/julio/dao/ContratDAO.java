@@ -123,7 +123,7 @@ public class ContratDAO {
                 "nom_contrat, " +
                 "montant " +
                 "FROM contrat " +
-                "WHERE id = ?";
+                "WHERE id_contrat = ?";
 
         try (PreparedStatement pstmt = dbConnection.getConnection().prepareStatement(sql)) {
 
@@ -340,7 +340,7 @@ public class ContratDAO {
         String sql = "UPDATE contrat " +
                 "SET nom_contrat = ?, " +
                 "montant = ? " +
-                "WHERE id = ?";
+                "WHERE id_contrat = ?";
         Connection conn = dbConnection.getConnection();
 
         try {
@@ -412,7 +412,7 @@ public class ContratDAO {
 
         try {
             conn.setAutoCommit(false);
-            String sql = "DELETE FROM contrat WHERE id = ?";
+            String sql = "DELETE FROM contrat WHERE id_contrat = ?";
 
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 pstmt.setInt(1, id);
