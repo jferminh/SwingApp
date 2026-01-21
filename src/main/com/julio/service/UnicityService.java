@@ -1,91 +1,54 @@
 package main.com.julio.service;
 
+import main.com.julio.dao.ClientDAO;
+import main.com.julio.dao.ProspectDAO;
+import main.com.julio.exception.DAOException;
 import main.com.julio.model.Client;
 import main.com.julio.model.Prospect;
-import main.com.julio.repository.ClientRepository;
-import main.com.julio.repository.ProspectRepository;
 
 /**
  * Service de vérification de l'unicité des données métier.
  * <p>
- * Cette classe fournit des méthodes pour garantir l'unicité des raisons sociales
- * des sociétés (clients et prospects). Elle interroge les repositories pour
- * détecter les doublons potentiels avant la création ou la modification d'entités.
+ * Version optimisée utilisant des requêtes ciblées dans les DAO
+ * plutôt que des parcours complets via findAll().
  * </p>
- *
- * <p><b>Règles métier appliquées :</b></p>
- * <ul>
- *   <li>Une raison sociale doit être unique à travers tous les clients ET prospects</li>
- *   <li>La comparaison est insensible à la casse (majuscules/minuscules)</li>
- *   <li>Lors d'une modification, l'entité en cours d'édition est exclue de la vérification</li>
- * </ul>
- *
- * @author Julio FERMIN
- * @version 1.0
- * @since 19/11/2025
- * @see ClientRepository
- * @see ProspectRepository
  */
 public class UnicityService {
 
-    /** Repository des clients pour vérifier l'unicité parmi les clients */
-    private final ClientRepository clientRepo;
+    private final ClientDAO clientDAO;
+    private final ProspectDAO prospectDAO;
 
-    /** Repository des prospects pour vérifier l'unicité parmi les prospects */
-    private final ProspectRepository prospectRepo;
-
-    /**
-     * Constructeur initialisant le service avec les repositories nécessaires.
-     * <p>
-     * Les repositories sont injectés via le constructeur pour faciliter
-     * les tests unitaires (injection de dépendances).
-     * </p>
-     *
-     * @param clientRepo repository des clients
-     * @param prospectRepo repository des prospects
-     */
-    public UnicityService(ClientRepository clientRepo, ProspectRepository prospectRepo) {
-        this.clientRepo = clientRepo;
-        this.prospectRepo = prospectRepo;
+    public UnicityService(ClientDAO clientDAO, ProspectDAO prospectDAO) {
+        this.clientDAO = clientDAO;
+        this.prospectDAO = prospectDAO;
     }
 
     /**
-     * Vérifie si une raison sociale existe déjà dans le système.
-     * <p>
-     * Cette méthode parcourt tous les prospects et clients pour détecter
-     * si la raison sociale fournie est déjà utilisée. La vérification est
-     * insensible à la casse grâce à {@link String#equalsIgnoreCase(String)}.
-     * </p>
+     * Vérifie si une raison sociale existe déjà dans le système
+     * (clients + prospects), en excluant éventuellement une entité.
      *
-     * <p><b>Algorithme de vérification :</b></p>
-     * <ol>
-     *   <li>Parcourt tous les prospects en excluant celui dont l'ID correspond à {@code idExcluire}</li>
-     *   <li>Si une correspondance est trouvée, retourne immédiatement true (doublon détecté)</li>
-     *   <li>Parcourt tous les clients en excluant celui dont l'ID correspond à {@code idExcluire}</li>
-     *   <li>Si une correspondance est trouvée, retourne immédiatement true (doublon détecté)</li>
-     *   <li>Si aucune correspondance n'est trouvée, retourne false (raison sociale unique)</li>
-     * </ol>
-     *
-     * @param raisonSociale la raison sociale à vérifier (ne devrait pas être null ou vide)
-     * @param idExcluire l'identifiant de l'entité à exclure de la vérification
-     *                   (0 pour une nouvelle entité, ID existant pour une modification)
-     * @return true si la raison sociale existe déjà (doublon détecté), false si elle est unique
+     * @param raisonSociale la raison sociale à vérifier
+     * @param idExclure     ID à exclure (0 ou null si création)
+     * @return true si doublon trouvé, false sinon
+     * @throws DAOException en cas d'erreur d'accès aux données
      */
-    public boolean isRaisonSocialDuplique(String raisonSociale, int idExcluire) {
-        // Vérification dans les prospects
-        for (Prospect prospect : prospectRepo.findAll()) {
-            if (prospect.getId() != idExcluire && prospect.getRaisonSociale().equalsIgnoreCase(raisonSociale)) {
-                return true; // Doublon trouvé dans les prospects
-            }
+    public boolean isRaisonSocialDuplique(String raisonSociale, Integer idExclure)
+            throws DAOException {
+
+        Integer idIgnore = (idExclure == null) ? 0 : idExclure;
+
+        // 1) Vérifier côté prospects
+        Prospect prospect = prospectDAO.findByRaisonSociale(raisonSociale);
+        if (prospect != null && !prospect.getId().equals(idIgnore)) {
+            return true;
         }
 
-        // Vérification dans les clients
-        for (Client client : clientRepo.findAll()) {
-            if (client.getId() != idExcluire && client.getRaisonSociale().equalsIgnoreCase(raisonSociale)) {
-                return true; // Doublon trouvé dans les clients
-            }
+        // 2) Vérifier côté clients
+        Client client = clientDAO.findByRaisonSociale(raisonSociale);
+        if (client != null && !client.getId().equals(idIgnore)) {
+            return true;
         }
 
-        return false; // Aucun doublon : raison sociale unique
+        return false;
     }
 }

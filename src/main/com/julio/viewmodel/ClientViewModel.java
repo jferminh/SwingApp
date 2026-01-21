@@ -7,6 +7,7 @@ import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Adresse;
 import main.com.julio.model.Client;
 import main.com.julio.service.LoggerService;
+import main.com.julio.service.UnicityService;
 
 import javax.swing.table.DefaultTableModel;
 import java.util.List;

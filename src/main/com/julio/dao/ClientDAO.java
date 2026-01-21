@@ -655,6 +655,51 @@ public class ClientDAO extends SocieteDAO {
         }
     }
 
+    public Client findByRaisonSociale(String raisonSociale) throws DAOException {
+        String sql =
+                "SELECT s.id_societe, s.raison_sociale, s.adresse_id, s.telephone, s.email, s.commentaires, " +
+                        "       c.id_client, c.chiffre_affaires, c.nb_employes, " +
+                        "       a.numero_rue, a.nom_rue, a.code_postal, a.ville " +
+                        "FROM societe s " +
+                        "INNER JOIN client c ON s.id_societe = c.id_societe " +
+                        "INNER JOIN adresse a ON s.adresse_id = a.id_adresse " +
+                        "WHERE LOWER(s.raison_sociale) = LOWER(?)";
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = dbConnexion.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, raisonSociale);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                return mapResultSetToClient(rs); // déjà utilisée dans ton ClientDAO
+            }
+            return null;
+
+        } catch (SQLException e) {
+            throw new DAOException(
+                    SQLExceptionAnalyzer.categorize(e),
+                    "findByRaisonSociale",
+                    null,
+                    "Erreur lors de la recherche de client par raison sociale : " + SQLExceptionAnalyzer.analyze(e),
+                    e
+            );
+        } catch (ValidationException e) {
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "findByRaisonSociale",
+                    null,
+                    "Données invalides pour le client : " + e.getMessage(),
+                    e
+            );
+        } finally {
+            closeResources(rs, pstmt, null); // pattern déjà utilisé dans ClientDAO
+        }
+    }
 
 // ========== MÉTHODES PRIVÉES UTILITAIRES ==========
 

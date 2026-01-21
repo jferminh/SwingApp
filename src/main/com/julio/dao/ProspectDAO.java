@@ -604,6 +604,52 @@ public class ProspectDAO extends SocieteDAO {
         }
     }
 
+    public Prospect findByRaisonSociale(String raisonSociale) throws DAOException {
+        String sql =
+                "SELECT p.id_prospect, p.id_societe, p.date_prospection, p.interesse, " +
+                        "       s.raison_sociale, s.adresse_id, s.telephone, s.email, s.commentaires, " +
+                        "       a.id_adresse, a.numero_rue, a.nom_rue, a.code_postal, a.ville " +
+                        "FROM prospect p " +
+                        "INNER JOIN societe s ON p.id_societe = s.id_societe " +
+                        "INNER JOIN adresse a ON s.adresse_id = a.id_adresse " +
+                        "WHERE LOWER(s.raison_sociale) = LOWER(?)";
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = dbConnexion.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, raisonSociale);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                return mapResultSetToProspect(rs); // déjà présente dans ProspectDAO
+            }
+            return null;
+
+        } catch (SQLException e) {
+            throw new DAOException(
+                    SQLExceptionAnalyzer.categorize(e),
+                    "findByRaisonSociale",
+                    null,
+                    "Erreur lors de la recherche de prospect par raison sociale : " + SQLExceptionAnalyzer.analyze(e),
+                    e
+            );
+        } catch (ValidationException e) {
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "findByRaisonSociale",
+                    null,
+                    "Données invalides pour le prospect : " + e.getMessage(),
+                    e
+            );
+        } finally {
+            closeResources(rs, pstmt, null);
+        }
+    }
+
     /**
      * Méthode utilitaire privée pour mapper un ResultSet vers un objet Prospect.
      * <p>
@@ -653,10 +699,6 @@ public class ProspectDAO extends SocieteDAO {
             );
 
             prospect.setId(prospectId);
-
-            LOGGER.log(Level.FINE,
-                    "Prospect mappé : ID={0}, Raison sociale={1}, Intéressé={2}",
-                    new Object[]{prospectId, raisonSociale, interesse});
 
             return prospect;
 
