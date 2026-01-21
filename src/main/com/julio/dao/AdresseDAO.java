@@ -234,6 +234,18 @@ public class AdresseDAO {
         Connection conn = dbConnexion.getConnection();
         return save(adresse, conn);
     }
+
+    /**
+     * Met à jour une adresse existante dans la base de données.
+     *
+     * <p><strong>IMPORTANT :</strong> Cette méthode reçoit une connexion externe
+     * et participe à une transaction parent. Elle NE DOIT PAS gérer commit/rollback.</p>
+     *
+     * @param adresse l'adresse à mettre à jour (doit avoir un ID valide)
+     * @param connection la connexion à utiliser (en transaction)
+     * @return true si la mise à jour a réussi, false si l'adresse n'existe pas
+     * @throws DAOException si une erreur survient lors de la mise à jour
+     */
     public boolean save(Adresse adresse, Connection connection) throws DAOException {
         if (adresse == null || adresse.getId() == null || adresse.getId() <= 0) {
             throw new DAOException(
@@ -244,25 +256,49 @@ public class AdresseDAO {
             );
         }
 
-        String query = "UPDATE adresse " +
-                "SET numero_rue = ?, " +
-                "nom_rue = ?, " +
-                "code_postal = ?, " +
-                "ville = ? " +
-                "WHERE id_adresse = ?";
-        try {
-            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-                pstmt.setString(1, adresse.getNumeroRue());
-                pstmt.setString(2, adresse.getNomRue());
-                pstmt.setString(3, adresse.getCodePostal());
-                pstmt.setString(4, adresse.getVille());
-                pstmt.setInt(5, adresse.getId());
+        if (connection == null) {
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "save",
+                    adresse.getId(),
+                    "La connexion ne peut pas être null"
+            );
+        }
 
-                int rowsAffected = pstmt.executeUpdate();
-                return rowsAffected > 0;
+        String sql = "UPDATE adresse " +
+                "SET numero_rue = ?, nom_rue = ?, code_postal = ?, ville = ? " +
+                "WHERE id_adresse = ?";
+
+        PreparedStatement pstmt = null;
+
+        try {
+            // ✅ CORRECTION : Ne pas utiliser try-with-resources
+            // La connexion est gérée par l'appelant (transaction parent)
+            pstmt = connection.prepareStatement(sql);
+            pstmt.setString(1, adresse.getNumeroRue());
+            pstmt.setString(2, adresse.getNomRue());
+            pstmt.setString(3, adresse.getCodePostal());
+            pstmt.setString(4, adresse.getVille());
+            pstmt.setInt(5, adresse.getId());
+
+            int rowsAffected = pstmt.executeUpdate();
+
+            if (rowsAffected > 0) {
+                LOGGER.log(Level.FINE,
+                        "Adresse mise à jour : ID={0}, {1} {2}, {3} {4}",
+                        new Object[]{adresse.getId(), adresse.getNumeroRue(), adresse.getNomRue(),
+                                adresse.getCodePostal(), adresse.getVille()});
+                return true;
+            } else {
+                LOGGER.log(Level.WARNING,
+                        "Aucune adresse trouvée avec l'ID {0} pour la mise à jour",
+                        adresse.getId());
+                return false;
             }
+
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "Erreur lors de la mise à jour de l'adresse avec ID " + adresse.getId(), e);
+            LOGGER.log(Level.SEVERE,
+                    "Erreur SQL lors de la mise à jour de l'adresse ID=" + adresse.getId(), e);
             throw new DAOException(
                     SQLExceptionAnalyzer.categorize(e),
                     "save",
@@ -270,8 +306,23 @@ public class AdresseDAO {
                     "Erreur lors de la mise à jour de l'adresse : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
+        } finally {
+            // ✅ IMPORTANT : Fermer SEULEMENT le PreparedStatement
+            // NE PAS :
+            // - Fermer la connexion (gérée par l'appelant)
+            // - Faire commit/rollback (géré par l'appelant)
+            // - Modifier autoCommit (géré par l'appelant)
+
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
+            }
         }
     }
+
 
 
     /**
@@ -286,7 +337,7 @@ public class AdresseDAO {
      * @return true si la suppression a réussi, false sinon
      * @throws DAOException si une erreur survient lors de la suppression
      */
-    public boolean delete(Integer id) throws DAOException {
+    public boolean deleteAdresse(Integer id) throws DAOException {
         if (id == null || id <= 0) {
             throw new DAOException(
                     DAOException.ErrorCode.INVALID_PARAMETER,
@@ -360,10 +411,11 @@ public class AdresseDAO {
      * Cette méthode ne gère PAS les transactions.
      * Elle doit être appelée UNIQUEMENT si l'adresse n'est plus référencée.
      *
-     * @param adresseId l'ID de l'adresse à supprimer
+     * @param connection
+     * @param adresseId  l'ID de l'adresse à supprimer
      * @throws DAOException si une erreur survient lors de la suppression
      */
-    public void deleteAdresseInTransaction(Integer adresseId) throws DAOException {
+    public void deleteAdresse(Connection connection, Integer adresseId) throws DAOException {
         if (adresseId == null || adresseId <= 0) {
             throw new DAOException(
                     DAOException.ErrorCode.INVALID_PARAMETER,

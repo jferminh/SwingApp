@@ -179,52 +179,80 @@ public abstract class SocieteDAO {
         }
     }
 
-
     /**
-     * Met à jour la partie société d'un client ou prospect dans une transaction existante.
-     * <p>
-     * Cette méthode NE gère PAS la transaction (pas de commit/rollback).
-     * Elle doit être appelée dans le contexte d'une transaction déjà démarrée.
+     * Met à jour une société existante dans la base de données.
      *
-     * @param societe la société à mettre à jour
-     * @param societeId l'ID de la société dans la table societe
-     * @param connection la connexion avec transaction active
-     * @throws DAOException si une erreur survient
+     * <p><strong>IMPORTANT :</strong> Cette méthode est appelée dans le contexte
+     * d'une transaction parent (depuis save()). Elle NE DOIT PAS gérer
+     * commit/rollback ni setAutoCommit.</p>
+     *
+     * <p>La transaction doit être gérée par l'appelant.</p>
+     *
+     * @param societe la société avec les nouvelles données
+     * @param societeId l'ID de la société à mettre à jour
+     * @param connection la connexion à utiliser (en transaction)
+     * @throws DAOException si une erreur survient lors de la mise à jour
      */
-    protected void saveSociete(Societe societe, Integer societeId, Connection connection) throws DAOException {
-//        if (societe == null || societe.getId() == null || societe.getId() <= 0) {
-//            throw new DAOException(
-//                    DAOException.ErrorCode.INVALID_PARAMETER,
-//                    "saveSociete",
-//                    societe != null ? societe.getId() : null,
-//                    "La société doit avoir un ID valide"
-//            );
-//        }
+    protected void saveSociete(Societe societe, Integer societeId, Connection connection)
+            throws DAOException {
 
-        // Metre à jour la société
-        String query = "UPDATE societe " +
-                "SET raison_sociale = ?, " +
-                "telephone = ?, " +
-                "email = ?, " +
-                "commentaires = ? " +
+        if (societe == null) {
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "saveSociete",
+                    societeId,
+                    "La société ne peut pas être null"
+            );
+        }
+
+        if (societeId == null || societeId <= 0) {
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "saveSociete",
+                    societeId,
+                    "L'ID société doit être un entier positif non null"
+            );
+        }
+
+        if (connection == null) {
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "saveSociete",
+                    societeId,
+                    "La connexion ne peut pas être null"
+            );
+        }
+
+        String sql = "UPDATE societe " +
+                "SET raison_sociale = ?, telephone = ?, email = ?, commentaires = ? " +
                 "WHERE id_societe = ?";
 
-        try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-            preparedStatement.setString(1, societe.getRaisonSociale());
-            preparedStatement.setString(2, societe.getTelephone());
-            preparedStatement.setString(3, societe.getEmail());
-            preparedStatement.setString(4, societe.getCommentaires());
-            preparedStatement.setInt(5, societeId);
+        PreparedStatement pstmt = null;
 
-            int rowsAffected = preparedStatement.executeUpdate();
+        try {
+            // ✅ CORRECTION : Ne pas utiliser try-with-resources
+            // La connexion est gérée par l'appelant (transaction parent)
+            pstmt = connection.prepareStatement(sql);
+            pstmt.setString(1, societe.getRaisonSociale());
+            pstmt.setString(2, societe.getTelephone());
+            pstmt.setString(3, societe.getEmail());
+            pstmt.setString(4, societe.getCommentaires());
+            pstmt.setInt(5, societeId);
+
+            int rowsAffected = pstmt.executeUpdate();
+
             if (rowsAffected == 0) {
                 throw new SQLException(
                         "La mise à jour de la société a échoué, aucune ligne affectée (ID=" + societeId + ")"
                 );
             }
+
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "Erreur lors de la mise à jour de la société" + societeId, e);
-            if (SQLExceptionAnalyzer.isUniqueConstraintViolation(e)){
+            LOGGER.log(Level.SEVERE,
+                    "Erreur SQL lors de la mise à jour de la société ID=" + societeId, e);
+
+            // Vérifier si c'est une violation de contrainte d'unicité
+            if (SQLExceptionAnalyzer.isUniqueConstraintViolation(e)) {
                 String constraintName = SQLExceptionAnalyzer.extractConstraintName(e);
                 throw new DAOException(
                         DAOException.ErrorCode.UNIQUE_CONSTRAINT_VIOLATION,
@@ -235,45 +263,68 @@ public abstract class SocieteDAO {
                         e
                 );
             }
+
             throw new DAOException(
                     SQLExceptionAnalyzer.categorize(e),
                     "saveSociete",
-                    societe.getId(),
-                    "Erreur lors de la mise à jour : " + SQLExceptionAnalyzer.analyze(e),
+                    societeId,
+                    "Erreur lors de la mise à jour de la société : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
+        } finally {
+            // ✅ IMPORTANT : Fermer SEULEMENT le PreparedStatement
+            // NE PAS :
+            // ._ Fermer la connexion (gérée par l'appelant)
+            // ._ Faire commit/rollback (géré par l'appelant)
+            // ._ Modifier autoCommit (géré par l'appelant)
+
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
+            }
         }
     }
 
     /**
-     * Supprime une société par son ID dans le contexte d'une transaction existante.
-     * <p>
-     * Cette méthode ne gère PAS les transactions (pas de setAutoCommit, commit ou rollback).
-     * Elle doit être appelée UNIQUEMENT dans le cadre d'une transaction déjà démarrée
-     * par la classe appelante (ClientDAO ou ProspectDAO).
-     * <p>
-     * Utilisée par ClientDAO.delete() et ProspectDAO.delete() pour supprimer
-     * la partie société après suppression de la partie spécifique (client/prospect).
+     * Supprime une société dans le contexte d'une transaction parent.
      *
+     * <p><strong>IMPORTANT :</strong> Cette méthode participe à une transaction
+     * gérée par l'appelant. Elle NE DOIT PAS gérer commit/rollback.</p>
+     *
+     * @param connection la connexion en transaction
      * @param societeId l'ID de la société à supprimer
      * @throws DAOException si une erreur survient lors de la suppression
-     *                      ou si l'ID est invalide ou si aucune société n'est trouvée
      */
-    protected void deleteSocieteInTransaction(Integer societeId) throws DAOException {
+    protected void deleteSociete(Connection connection, Integer societeId) throws DAOException {
+        if (connection == null) {
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "deleteSociete",
+                    societeId,
+                    "La connexion ne peut pas être null"
+            );
+        }
+
         if (societeId == null || societeId <= 0) {
             LOGGER.log(Level.WARNING, "Tentative de suppression avec ID société invalide : {0}", societeId);
             throw new DAOException(
                     DAOException.ErrorCode.INVALID_PARAMETER,
-                    "deleteSocieteInTransaction",
+                    "deleteSociete",
                     societeId,
                     "L'ID société doit être un entier positif non null"
             );
         }
 
-        String deleteSocieteSQL = "DELETE FROM societe WHERE id_societe = ?";
+        String sql = "DELETE FROM societe WHERE id_societe = ?";
+        PreparedStatement pstmt = null;
 
-        try (PreparedStatement pstmt = dbConnexion.getConnection().prepareStatement(deleteSocieteSQL)) {
+        try {
+            pstmt = connection.prepareStatement(sql);
             pstmt.setInt(1, societeId);
+
             int rowsAffected = pstmt.executeUpdate();
 
             if (rowsAffected > 0) {
@@ -282,7 +333,7 @@ public abstract class SocieteDAO {
                 LOGGER.log(Level.WARNING, "Aucune société trouvée avec l'ID {0}", societeId);
                 throw new DAOException(
                         DAOException.ErrorCode.ENTITY_NOT_FOUND,
-                        "deleteSocieteInTransaction",
+                        "deleteSociete",
                         societeId,
                         "Aucune société trouvée avec l'ID " + societeId
                 );
@@ -291,12 +342,11 @@ public abstract class SocieteDAO {
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Erreur SQL lors de la suppression de la société ID=" + societeId, e);
 
-            // Analyse spécifique pour les violations de contraintes
             if (SQLExceptionAnalyzer.isForeignKeyViolation(e)) {
                 String constraintName = SQLExceptionAnalyzer.extractConstraintName(e);
                 throw new DAOException(
                         DAOException.ErrorCode.FOREIGN_KEY_VIOLATION,
-                        "deleteSocieteInTransaction",
+                        "deleteSociete",
                         societeId,
                         "Impossible de supprimer la société : elle est référencée par d'autres entités" +
                                 (constraintName != null ? " (contrainte: " + constraintName + ")" : ""),
@@ -304,69 +354,20 @@ public abstract class SocieteDAO {
                 );
             }
 
-            // Analyse générale des autres erreurs SQL
             throw new DAOException(
                     SQLExceptionAnalyzer.categorize(e),
-                    "deleteSocieteInTransaction",
+                    "deleteSociete",
                     societeId,
                     "Erreur lors de la suppression de la société : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
-        }
-    }
-
-
-    protected boolean deleteSociete(Integer id) throws DAOException {
-        if (id == null || id <= 0) {
-            throw new DAOException(
-                    DAOException.ErrorCode.INVALID_PARAMETER,
-                    "deleteSociete",
-                    id,
-                    "L'ID doit être valide"
-            );
-        }
-
-        Connection connection = dbConnexion.getConnection();
-
-        try {
-            connection.setAutoCommit(false);
-
-            String query = "DELETE FROM societe " +
-                    "WHERE id_societe = ?";
-            try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-                preparedStatement.setInt(1, id);
-
-                int rowsAffected = preparedStatement.executeUpdate();
-
-                if (rowsAffected > 0) {
-                    connection.commit();
-//                    LOGGER.log(Level.INFO, "Société supprimée avec l'ID {0}", id);
-                    return true;
-                } else {
-                    connection.rollback();
-//                    LOGGER.log(Level.WARNING, "Aucune société trouvée avec l'ID {0}", id);
-                    return false;
-                }
-            }
-        } catch (SQLException sqlEx) {
-            try {
-                connection.rollback();
-                LOGGER.log(Level.SEVERE, "Erreur lors de la suppession, rollback effectué", sqlEx);
-            } catch (SQLException rollbackEx) {
-                LOGGER.log(Level.SEVERE, "Erreur lors du rollback", rollbackEx);
-            }
-            throw new DAOException(
-                    SQLExceptionAnalyzer.categorize(sqlEx),
-                    "deleteSociete",
-                    id,
-                    "Erreur lors de la suppression : " + SQLExceptionAnalyzer.analyze(sqlEx),
-                    sqlEx
-            );
         } finally {
-            try {
-                connection.setAutoCommit(true);
-            } catch (SQLException sqlEx) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la réactivation de l'autoCommit", sqlEx);
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
             }
         }
     }
