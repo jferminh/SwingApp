@@ -9,9 +9,7 @@ import main.com.julio.service.LoggerService;
 import main.com.julio.util.SQLExceptionAnalyzer;
 
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -54,64 +52,98 @@ public class ClientDAO extends SocieteDAO {
      * @throws DAOException si une erreur survient lors de la requête
      */
     public List<Client> findAll() throws DAOException {
-        List<Client> clients = new ArrayList<>();
-        String query = "SELECT s.id_societe, " +
-                "s.raison_sociale, " +
-                "s.adresse_id, " +
-                "s.telephone, " +
-                "s.email, " +
-                "s.commentaires, " +
-                "c.id_client, " +
-                "c.chiffre_affaires, " +
-                "c.nb_employes, " +
-                "a.numero_rue, " +
-                "a.nom_rue, " +
-                "a.code_postal, " +
-                "a.ville " +
-                "FROM Societe s " +
+        Map<Integer, Client> clientsMap = new LinkedHashMap<>();
+
+        String sql = "SELECT " +
+                "    s.id_societe, s.raison_sociale, s.adresse_id, " +
+                "    s.telephone, s.email, s.commentaires, " +
+                "    c.id_client, c.chiffre_affaires, c.nb_employes, " +
+                "    a.numero_rue, a.nom_rue, a.code_postal, a.ville, " +
+                "    ct.id_contrat, ct.nom_contrat, ct.montant " +
+                "FROM societe s " +
                 "INNER JOIN client c ON s.id_societe = c.id_societe " +
-                "INNER JOIN adresse a ON s.adresse_id = a.id_adresse";
+                "INNER JOIN adresse a ON s.adresse_id = a.id_adresse " +
+                "LEFT JOIN contrat ct ON c.id_client = ct.client_id " +
+                "ORDER BY s.raison_sociale ASC";
 
-        try (Statement statement = dbConnexion.getConnection().createStatement();
+        // ✅ SOLUTION : Ne PAS utiliser try-with-resources sur la connexion
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
 
-            ResultSet rs = statement.executeQuery(query)) {
+        try {
+            Connection conn = dbConnexion.getConnection();
+            pstmt = conn.prepareStatement(sql);
+            rs = pstmt.executeQuery();
+
             while (rs.next()) {
-                Client client = mapResultSetToClient(rs);
+                Integer clientId = rs.getInt("id_client");
 
-                // Charger les contrats du client
-                try {
-                    List<Contrat> contrats = contratDAO.findByIdClient(client.getId());
-                    for (Contrat contrat : contrats) {
-                        client.ajouterContrat(contrat);
+                Client client = clientsMap.get(clientId);
+
+                if (client == null) {
+                    try {
+                        client = mapResultSetToClient(rs);
+                        clientsMap.put(clientId, client);
+                    } catch (ValidationException e) {
+                        throw new DAOException(
+                                DAOException.ErrorCode.INVALID_PARAMETER,
+                                "findAll",
+                                clientId,
+                                "Données invalides : " + e.getMessage(),
+                                e
+                        );
                     }
-                } catch (DAOException e) {
-                    LOGGER.log(Level.WARNING,
-                            "Imposible de charger les contrats du client ID= {0}", client.getId());
                 }
-                clients.add(client);
+
+                // Ajouter le contrat si présent
+                Integer contratId = rs.getInt("id_contrat");
+                if (!rs.wasNull() && contratId != null && contratId > 0) {
+                    try {
+                        Contrat contrat = new Contrat(
+                                clientId,
+                                rs.getString("nom_contrat"),
+                                rs.getDouble("montant")
+                        );
+                        contrat.setId(contratId);
+
+                        if (!client.getContrats().contains(contrat)) {
+                            client.ajouterContrat(contrat);
+                        }
+                    } catch (ValidationException e) {
+                        LOGGER.log(Level.WARNING,
+                                "Contrat invalide ignoré pour client ID={0}", clientId);
+                    }
+                }
             }
-            return clients;
+
+            LOGGER.log(Level.INFO, "{0} client(s) récupéré(s)", clientsMap.size());
+            return new ArrayList<>(clientsMap.values());
+
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "Erreur lors de la récupération de tous les clients", e);
+            LOGGER.log(Level.SEVERE, "Erreur SQL dans findAll", e);
             throw new DAOException(
                     SQLExceptionAnalyzer.categorize(e),
                     "findAll",
                     null,
-                    "Erreur lors de la récupération de tous les clients : " + SQLExceptionAnalyzer.analyze(e),
+                    "Erreur récupération clients : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
-        } catch (ValidationException ex) {
-            LOGGER.log(Level.SEVERE, "Erreur de validation lors du mapping dans findAll", ex);
-            throw new DAOException(
-                    DAOException.ErrorCode.READ_ERROR,
-                    "findAll",
-                    null,
-                    "Erreur de validation des données du client : " + ex.getMessage(),
-                    ex
-            );
+        } finally {
+            // ✅ IMPORTANT : Fermer SEULEMENT ResultSet et PreparedStatement
+            // NE PAS FERMER la connexion (gérée par Singleton)
+            if (rs != null) {
+                try { rs.close(); } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture ResultSet", e);
+                }
+            }
+            if (pstmt != null) {
+                try { pstmt.close(); } catch (SQLException e) {
+                    LOGGER.log(Level.WARNING, "Erreur fermeture PreparedStatement", e);
+                }
+            }
         }
-
     }
+
 
     /**
      * Récupère un client par son identifiant.
