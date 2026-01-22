@@ -2,6 +2,7 @@ package main.com.julio.viewmodel;
 
 import main.com.julio.dao.ClientDAO;
 import main.com.julio.dao.ContratDAO;
+import main.com.julio.dao.ProspectDAO;
 import main.com.julio.exception.DAOException;
 import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Adresse;
@@ -41,6 +42,7 @@ public class ClientViewModel {
 
     private final ClientDAO clientDAO;
     private final ContratDAO contratDAO;
+    private final ProspectDAO prospectDAO;
 
     /**
      * Constructeur avec injection des DAO.
@@ -50,6 +52,7 @@ public class ClientViewModel {
     public ClientViewModel() throws DAOException {
         this.clientDAO = new ClientDAO();
         this.contratDAO = new ContratDAO();
+        this.prospectDAO = new ProspectDAO();
     }
 
     /**
@@ -86,6 +89,12 @@ public class ClientViewModel {
                               int nbEmployes) throws ValidationException, DAOException {
 
         try {
+            UnicityService unicityService = new UnicityService(clientDAO, prospectDAO);
+            if (unicityService.isRaisonSocialeDupliquee(raisonSociale)) {
+                throw new ValidationException(
+                        "La raison sociale '" + raisonSociale + "' existe dèjà dans le système!"
+                );
+            }
             // Créer l'entité Client avec Adresse
             Adresse adresse = new main.com.julio.model.Adresse(
                     numeroRue,
@@ -162,6 +171,16 @@ public class ClientViewModel {
                 return false;
             }
 
+            // Vérifier unicité SEULEMENT si raison sociale a changé
+            if (!client.getRaisonSociale().equals(raisonSociale)) {
+                UnicityService unicityService = new UnicityService(clientDAO, prospectDAO);
+
+                if (unicityService.isRaisonSocialeDupliquee(raisonSociale, id)) {
+                    throw new ValidationException(
+                            "La raison sociale '" + raisonSociale + "' es dèjà utilisée"
+                    );
+                }
+            }
             // Mettre à jour les données
             client.setRaisonSociale(raisonSociale);
             client.setTelephone(telephone);

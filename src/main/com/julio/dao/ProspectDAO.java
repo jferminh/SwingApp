@@ -64,7 +64,7 @@ public class ProspectDAO extends SocieteDAO {
 
         String sql = "SELECT " +
                 "    p.id_prospect, p.id_societe, p.date_prospection, p.interesse, " +
-                "    s.raison_sociale, s.adresse_id, s.telephone, s.email, s.commentaires, " +
+                "    s.raison_sociale, a.id_adresse, s.telephone, s.email, s.commentaires, " +
                 "    a.numero_rue, a.nom_rue, a.code_postal, a.ville " +
                 "FROM prospect p " +
                 "INNER JOIN societe s ON p.id_societe = s.id_societe " +
@@ -124,7 +124,7 @@ public class ProspectDAO extends SocieteDAO {
 
         String sql = "SELECT " +
                 "    p.id_prospect, p.id_societe, p.date_prospection, p.interesse, " +
-                "    s.raison_sociale, s.adresse_id, s.telephone, s.email, s.commentaires, " +
+                "    s.raison_sociale, a.id_adresse, s.telephone, s.email, s.commentaires, " +
                 "    a.numero_rue, a.nom_rue, a.code_postal, a.ville " +
                 "FROM prospect p " +
                 "INNER JOIN societe s ON p.id_societe = s.id_societe " +
@@ -604,49 +604,75 @@ public class ProspectDAO extends SocieteDAO {
         }
     }
 
+    /**
+     * Recherche un prospect par sa raison sociale (exact match, sensible à la casse).
+     *
+     * @param raisonSociale la raison sociale à rechercher
+     * @return le prospect trouvé ou null si non trouvé
+     * @throws DAOException si une erreur survient lors de la recherche
+     */
     public Prospect findByRaisonSociale(String raisonSociale) throws DAOException {
-        String sql =
-                "SELECT p.id_prospect, p.id_societe, p.date_prospection, p.interesse, " +
-                        "       s.raison_sociale, s.adresse_id, s.telephone, s.email, s.commentaires, " +
-                        "       a.id_adresse, a.numero_rue, a.nom_rue, a.code_postal, a.ville " +
-                        "FROM prospect p " +
-                        "INNER JOIN societe s ON p.id_societe = s.id_societe " +
-                        "INNER JOIN adresse a ON s.adresse_id = a.id_adresse " +
-                        "WHERE LOWER(s.raison_sociale) = LOWER(?)";
-
-        Connection conn = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = dbConnexion.getConnection();
-            pstmt = conn.prepareStatement(sql);
-            pstmt.setString(1, raisonSociale);
-            rs = pstmt.executeQuery();
-
-            if (rs.next()) {
-                return mapResultSetToProspect(rs); // déjà présente dans ProspectDAO
-            }
-            return null;
-
-        } catch (SQLException e) {
-            throw new DAOException(
-                    SQLExceptionAnalyzer.categorize(e),
-                    "findByRaisonSociale",
-                    null,
-                    "Erreur lors de la recherche de prospect par raison sociale : " + SQLExceptionAnalyzer.analyze(e),
-                    e
-            );
-        } catch (ValidationException e) {
+        if (raisonSociale == null || raisonSociale.trim().isEmpty()) {
             throw new DAOException(
                     DAOException.ErrorCode.INVALID_PARAMETER,
                     "findByRaisonSociale",
                     null,
-                    "Données invalides pour le prospect : " + e.getMessage(),
+                    "La raison sociale ne peut pas être null ou vide"
+            );
+        }
+
+        String sql = "SELECT p.id_prospect, s.raison_sociale, " +
+                "a.id_adresse, a.numero_rue, a.nom_rue, a.code_postal, a.ville, " +
+                "s.telephone, s.email, s.commentaires, " +
+                "p.date_prospection, p.interesse " +
+                "FROM prospect p " +
+                "INNER JOIN societe s ON p.id_societe = s.id_societe " +
+                "INNER JOIN adresse a ON s.adresse_id = a.id_adresse " +
+                "WHERE s.raison_sociale = ?";
+
+        Connection connection = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            connection = dbConnexion.getConnection();
+            pstmt = connection.prepareStatement(sql);
+            pstmt.setString(1, raisonSociale);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                try {
+                    return mapResultSetToProspect(rs);
+
+                } catch (ValidationException e) {
+                    LOGGER.log(Level.SEVERE,
+                            "Erreur validation données prospect avec raison sociale ''{0}''",
+                            raisonSociale);
+                    throw new DAOException(
+                            DAOException.ErrorCode.INVALID_PARAMETER,
+                            "findByRaisonSociale",
+                            null,
+                            "Données invalides pour le prospect : " + e.getMessage(),
+                            e
+                    );
+                }
+            }
+
+            return null;
+
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE,
+                    "Erreur SQL lors de findByRaisonSociale avec ''{0}''",
+                    raisonSociale);
+            throw new DAOException(
+                    SQLExceptionAnalyzer.categorize(e),
+                    "findByRaisonSociale",
+                    null,
+                    "Erreur lors de la recherche par raison sociale : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
         } finally {
-            closeResources(rs, pstmt, null);
+            closeResources(rs, pstmt, connection);
         }
     }
 
@@ -663,28 +689,28 @@ public class ProspectDAO extends SocieteDAO {
      */
     private Prospect mapResultSetToProspect(ResultSet rs) throws SQLException, DAOException, ValidationException {
         try {
-            Integer prospectId = rs.getInt("p.id_prospect");
-            Integer societeId = rs.getInt("p.id_societe");
-            String raisonSociale = rs.getString("s.raison_sociale");
-            String telephone = rs.getString("s.telephone");
-            String email = rs.getString("s.email");
-            String commentaires = rs.getString("s.commentaires");
+            Integer prospectId = rs.getInt("id_prospect");
+//            Integer societeId = rs.getInt("p.id_societe");
+            String raisonSociale = rs.getString("raison_sociale");
+            String telephone = rs.getString("telephone");
+            String email = rs.getString("email");
+            String commentaires = rs.getString("commentaires");
 
             // Adresse
-            Integer adresseId = rs.getInt("s.adresse_id");
-            String numeroRue = rs.getString("a.numero_rue");
-            String nomRue = rs.getString("a.nom_rue");
-            String codePostal = rs.getString("a.code_postal");
-            String ville = rs.getString("a.ville");
+            Integer adresseId = rs.getInt("id_adresse");
+            String numeroRue = rs.getString("numero_rue");
+            String nomRue = rs.getString("nom_rue");
+            String codePostal = rs.getString("code_postal");
+            String ville = rs.getString("ville");
 
             Adresse adresse = new Adresse(numeroRue, nomRue, codePostal, ville);
             adresse.setId(adresseId);
 
             // Prospect spécifique
-            java.sql.Date sqlDate = rs.getDate("p.date_prospection");
+            java.sql.Date sqlDate = rs.getDate("date_prospection");
             LocalDate dateProspection = sqlDate != null ? sqlDate.toLocalDate() : null;
 
-            int interesseInt = rs.getInt("p.interesse");
+            int interesseInt = rs.getInt("interesse");
             Interesse interesse = Interesse.fromInt(interesseInt);
 
             // Créer le prospect
@@ -709,16 +735,6 @@ public class ProspectDAO extends SocieteDAO {
                     "mapResultSetToProspect",
                     null,
                     "Données invalides lors du mapping du prospect : " + e.getMessage(),
-                    e
-            );
-        } catch (IllegalArgumentException e) {
-            LOGGER.log(Level.SEVERE,
-                    "Valeur 'interesse' invalide dans la BDD : " + rs.getInt("p.interesse"), e);
-            throw new DAOException(
-                    DAOException.ErrorCode.INVALID_PARAMETER,
-                    "mapResultSetToProspect",
-                    null,
-                    e.getMessage(),
                     e
             );
         }

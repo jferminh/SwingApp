@@ -1,5 +1,6 @@
 package main.com.julio.viewmodel;
 
+import main.com.julio.dao.ClientDAO;
 import main.com.julio.dao.ProspectDAO;
 import main.com.julio.exception.DAOException;
 import main.com.julio.exception.ValidationException;
@@ -7,6 +8,7 @@ import main.com.julio.model.Adresse;
 import main.com.julio.model.Interesse;
 import main.com.julio.model.Prospect;
 import main.com.julio.service.LoggerService;
+import main.com.julio.service.UnicityService;
 
 import javax.swing.table.DefaultTableModel;
 import java.time.LocalDate;
@@ -36,6 +38,7 @@ public class ProspectViewModel {
     private static final Logger LOGGER = LoggerService.getLogger(ProspectViewModel.class);
 
     private final ProspectDAO prospectDAO;
+    private final ClientDAO clientDAO;
 
     /**
      * Constructeur avec injection du DAO.
@@ -44,6 +47,7 @@ public class ProspectViewModel {
      */
     public ProspectViewModel() throws DAOException {
         this.prospectDAO = new ProspectDAO();
+        this.clientDAO = new ClientDAO();
     }
 
     /**
@@ -80,6 +84,12 @@ public class ProspectViewModel {
                                   Interesse interesse) throws ValidationException, DAOException {
 
         try {
+            UnicityService unicityService = new UnicityService(clientDAO, prospectDAO);
+            if (unicityService.isRaisonSocialeDupliquee(raisonSociale)) {
+                throw new ValidationException(
+                        "La raison sociale '" + raisonSociale + "' existe dèjà dans le système!"
+                );
+            }
             // Créer l'entité Prospect avec Adresse
             Adresse adresse = new main.com.julio.model.Adresse(
                     numeroRue,
@@ -154,6 +164,17 @@ public class ProspectViewModel {
 
             if (prospect == null) {
                 return false;
+            }
+
+            // Vérifier unicité SEULEMENT si raison sociale a changé
+            if (!prospect.getRaisonSociale().equals(raisonSociale)) {
+                UnicityService unicityService = new UnicityService(clientDAO, prospectDAO);
+
+                if (unicityService.isRaisonSocialeDupliquee(raisonSociale, id)) {
+                    throw new ValidationException(
+                            "La raison sociale '" + raisonSociale + "' es dèjà utilisée"
+                    );
+                }
             }
 
             // Mettre à jour les données

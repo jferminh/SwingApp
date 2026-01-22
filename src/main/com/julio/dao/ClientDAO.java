@@ -2,13 +2,12 @@ package main.com.julio.dao;
 
 import main.com.julio.exception.DAOException;
 import main.com.julio.exception.ValidationException;
-import main.com.julio.model.Adresse;
-import main.com.julio.model.Client;
-import main.com.julio.model.Contrat;
+import main.com.julio.model.*;
 import main.com.julio.service.LoggerService;
 import main.com.julio.util.SQLExceptionAnalyzer;
 
 import java.sql.*;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -57,7 +56,7 @@ public class ClientDAO extends SocieteDAO {
         Map<Integer, Client> clientsMap = new LinkedHashMap<>();
 
         String sql = "SELECT " +
-                "    s.id_societe, s.raison_sociale, s.adresse_id, " +
+                "    s.id_societe, s.raison_sociale, a.id_adresse, " +
                 "    s.telephone, s.email, s.commentaires, " +
                 "    c.id_client, c.chiffre_affaires, c.nb_employes, " +
                 "    a.numero_rue, a.nom_rue, a.code_postal, a.ville, " +
@@ -156,7 +155,7 @@ public class ClientDAO extends SocieteDAO {
         }
 
         String sql = "SELECT " +
-                "    s.id_societe, s.raison_sociale, s.adresse_id, " +
+                "    s.id_societe, s.raison_sociale, a.id_adresse, " +
                 "    s.telephone, s.email, s.commentaires, " +
                 "    c.id_client, c.chiffre_affaires, c.nb_employes, " +
                 "    a.numero_rue, a.nom_rue, a.code_postal, a.ville, " +
@@ -655,51 +654,78 @@ public class ClientDAO extends SocieteDAO {
         }
     }
 
+    /**
+     * Recherche un client par sa raison sociale (exact match, sensible à la casse).
+     *
+     * @param raisonSociale la raison sociale à rechercher
+     * @return le client trouvé ou null si non trouvé
+     * @throws DAOException si une erreur survient lors de la recherche
+     */
     public Client findByRaisonSociale(String raisonSociale) throws DAOException {
-        String sql =
-                "SELECT s.id_societe, s.raison_sociale, s.adresse_id, s.telephone, s.email, s.commentaires, " +
-                        "       c.id_client, c.chiffre_affaires, c.nb_employes, " +
-                        "       a.numero_rue, a.nom_rue, a.code_postal, a.ville " +
-                        "FROM societe s " +
-                        "INNER JOIN client c ON s.id_societe = c.id_societe " +
-                        "INNER JOIN adresse a ON s.adresse_id = a.id_adresse " +
-                        "WHERE LOWER(s.raison_sociale) = LOWER(?)";
-
-        Connection conn = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = dbConnexion.getConnection();
-            pstmt = conn.prepareStatement(sql);
-            pstmt.setString(1, raisonSociale);
-            rs = pstmt.executeQuery();
-
-            if (rs.next()) {
-                return mapResultSetToClient(rs); // déjà utilisée dans ton ClientDAO
-            }
-            return null;
-
-        } catch (SQLException e) {
-            throw new DAOException(
-                    SQLExceptionAnalyzer.categorize(e),
-                    "findByRaisonSociale",
-                    null,
-                    "Erreur lors de la recherche de client par raison sociale : " + SQLExceptionAnalyzer.analyze(e),
-                    e
-            );
-        } catch (ValidationException e) {
+        if (raisonSociale == null || raisonSociale.trim().isEmpty()) {
             throw new DAOException(
                     DAOException.ErrorCode.INVALID_PARAMETER,
                     "findByRaisonSociale",
                     null,
-                    "Données invalides pour le client : " + e.getMessage(),
+                    "La raison sociale ne peut pas être null ou vide"
+            );
+        }
+
+        String sql = "SELECT c.id_client, s.raison_sociale, " +
+                "a.id_adresse, a.numero_rue, a.nom_rue, a.code_postal, a.ville, " +
+                "s.telephone, s.email, s.commentaires, " +
+                "c.chiffre_affaires, c.nb_employes " +
+                "FROM client c " +
+                "INNER JOIN societe s ON c.id_societe = s.id_societe " +
+                "INNER JOIN adresse a ON s.adresse_id = a.id_adresse " +
+                "WHERE s.raison_sociale = ?";
+
+        Connection connection = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            connection = dbConnexion.getConnection();
+            pstmt = connection.prepareStatement(sql);
+            pstmt.setString(1, raisonSociale);
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                try {
+                    return mapResultSetToClient(rs);
+
+                } catch (ValidationException e) {
+                    LOGGER.log(Level.SEVERE,
+                            "Erreur validation données client avec raison sociale ''{0}''",
+                            raisonSociale);
+                    throw new DAOException(
+                            DAOException.ErrorCode.INVALID_PARAMETER,
+                            "findByRaisonSociale",
+                            null,
+                            "Données invalides pour le client : " + e.getMessage(),
+                            e
+                    );
+                }
+            }
+
+            return null;
+
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE,
+                    "Erreur SQL lors de findByRaisonSociale avec ''{0}''",
+                    raisonSociale);
+            throw new DAOException(
+                    SQLExceptionAnalyzer.categorize(e),
+                    "findByRaisonSociale",
+                    null,
+                    "Erreur lors de la recherche par raison sociale : " + SQLExceptionAnalyzer.analyze(e),
                     e
             );
         } finally {
-            closeResources(rs, pstmt, null); // pattern déjà utilisé dans ClientDAO
+            closeResources(rs, pstmt, connection);
         }
     }
+
 
 // ========== MÉTHODES PRIVÉES UTILITAIRES ==========
 
@@ -764,34 +790,61 @@ public class ClientDAO extends SocieteDAO {
     }
 
     /**
-     * Méthode utilitaire pour mapper un ResultSet vers un objet Client.
+     * Mappe un ResultSet vers un objet Client.
      *
-     * @param rs le ResultSet contenant les données
-     * @return l'objet Client créé
-     * @throws SQLException        si une erreur survient lors de la lecture du ResultSet
-     * @throws ValidationException si les données ne respectent pas les règles métier
+     * @param rs le ResultSet positionné sur une ligne client
+     * @return le client mappé
+     * @throws SQLException si erreur d'accès aux données du ResultSet
+     * @throws DAOException si les données sont invalides (ValidationException encapsulée)
      */
-    private Client mapResultSetToClient(ResultSet rs) throws SQLException, ValidationException {
-        // Reconstituer l'adresse
-        Adresse adresse = new Adresse(
-                rs.getString("numero_rue"),
-                rs.getString("nom_rue"),
-                rs.getString("code_postal"),
-                rs.getString("ville")
-        );
-        adresse.setId(rs.getInt("id_societe"));
+    private Client mapResultSetToClient(ResultSet rs) throws SQLException, DAOException, ValidationException {
+        try {
+            // ========== Données Client ==========
+            Integer clientId = rs.getInt("id_client");
+            String raisonSociale = rs.getString("raison_sociale");
+            String telephone = rs.getString("telephone");
+            String email = rs.getString("email");
+            String commentaires = rs.getString("commentaires");
 
-        // Reconstituer le client
-        Client client = new Client(
-                rs.getString("raison_sociale"),
-                adresse,
-                rs.getString("telephone"),
-                rs.getString("email"),
-                rs.getString("commentaires"),
-                rs.getLong("chiffre_affaires"),
-                rs.getInt("nb_employes")
-        );
-        client.setId(rs.getInt("id_client"));
-        return client;
+            // ========== Adresse ==========
+            Integer adresseId = rs.getInt("id_adresse");
+            String numeroRue = rs.getString("numero_rue");
+            String nomRue = rs.getString("nom_rue");
+            String codePostal = rs.getString("code_postal");
+            String ville = rs.getString("ville");
+
+            Adresse adresse = new Adresse(numeroRue, nomRue, codePostal, ville);
+            adresse.setId(adresseId);
+
+            // ========== Données spécifiques Client ==========
+            long chiffreAffaires = rs.getLong("chiffre_affaires");
+            int nbEmployes = rs.getInt("nb_employes");
+
+            // ========== Créer le Client ==========
+            Client client = new Client(
+                    raisonSociale,
+                    adresse,
+                    telephone,
+                    email,
+                    commentaires,
+                    chiffreAffaires,
+                    nbEmployes
+            );
+
+            client.setId(clientId);
+
+            return client;
+
+        } catch (ValidationException e) {
+            LOGGER.log(Level.SEVERE, "Erreur de validation lors du mapping du client", e);
+            throw new DAOException(
+                    DAOException.ErrorCode.INVALID_PARAMETER,
+                    "mapResultSetToClient",
+                    null,
+                    "Données invalides lors du mapping du client : " + e.getMessage(),
+                    e
+            );
+        }
     }
+
 }
