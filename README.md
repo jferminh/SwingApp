@@ -1,103 +1,217 @@
+# 📊 ECF Reverso - Application de Gestion Clients/Prospects
 
-### Aperçu
+> Application desktop Java Swing pour gérer Clients, Prospects et Contrats avec persistance MySQL, architecture DAO et pattern Singleton.
 
-Application desktop Java Swing pour gérer Clients, Prospects et Contrats, en architecture MVVM avec validations, unicité de raison sociale et logging. L’interface d’accueil permet la sélection Clients/Prospects, les actions CRUD et la visualisation des contrats depuis une même fenêtre.
+[![Java](https://img.shields.io/badge/Java-25+-orange.svg)](https://www.oracle.com/java/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0+-blue.svg)](https://www.mysql.com/)
+[![JUnit](https://img.shields.io/badge/JUnit-5.8.1-green.svg)](https://junit.org/junit5/)
+[![License](https://img.shields.io/badge/License-AFPA_ECF-red.svg)](LICENSE)
 
-### Fonctionnalités
+---
 
-- Gestion des entités Client, Prospect, Contrat (Créer, Modifier, Supprimer, Afficher).
-- Accueil unifié : sélection Clients/Prospects via JRadioButton, barre d’actions (Créer, Modifier, Supprimer, Voir Contrats, Quitter) et panneau inline de sélection avec JComboBox + Valider/Annuler.
-- Liste triée par raison sociale (Comparator null-safe, insensible à la casse), avec désambigüisation par ID.
-- Préchargement des contrats de démonstration pour des clients spécifiés.
-- Suppression en cascade : supprimer un client supprime d’abord ses contrats puis le client.
-- Validations (regex pour téléphone, email, code postal) et règles métier (CA >= 200; nb employés > 0).
-- Unicité inter-entités : raison sociale unique parmi Clients et Prospects, insensible à la casse, avec exclusion par ID lors d’une modification.
-- Tests JUnit5 paramétrés et structurés en @Nested, couvrant validation, modèles et services d’unicité.
+## 📋 Aperçu
 
-### Architecture
+Application desktop Java Swing pour gérer **Clients**, **Prospects** et **Contrats** avec persistance **MySQL**, architecture **DAO/Singleton**, validations métier strictes et logging structuré. Interface MVVM avec navigation fluide entre entités et opérations CRUD complètes.
 
-- Pattern MVVM : View (Swing), ViewModel (logique de présentation), Model (entités), Services (validation, unicité, logging), Repositories (données en mémoire).
-- Packages recommandés :
-    - model/ (Adresse, Societe, Client, Prospect, Contrat, Interesse)
-    - service/ (ValidationService, UnicityService, LoggingService)
-    - repository/ (ClientRepository, ProspectRepository, ContratRepository)
-    - viewmodel/ (ClientViewModel, ProspectViewModel, ContratViewModel)
-    - view/ (AccueilView, ListeView, FormulaireView, ListeContratsView)
-    - util/ (DateUtils, RegexPatterns, DisplayDialog)
+---
 
-### AccueilView unifiée
+## 🏗️ Architecture
 
-- JRadioButtons pour choisir “Clients” ou “Prospects”.
-- Barre d’actions : Créer, Modifier, Supprimer, Voir Contrats, Quitter ; Voir Contrats activé uniquement pour Clients.
-- Panel inline qui s’affiche pour Modifier/Supprimer/Voir Contrats : JComboBox trié par raison sociale + boutons “Valider” et “Annuler”.
-- Pas de boîtes de dialogue externes pour la sélection : tout se passe dans AccueilView.
+### Pattern DAO/Singleton
+- **Model** : Entités métier (`Client`, `Prospect`, `Contrat`, `Adresse`, `Societe`, `Interesse`)
+- **DAO** : Accès données MySQL (`ClientDAO`, `ProspectDAO`, `ContratDAO`, `AdresseDAO`, `SocieteDAO`)
+- **Database** : `DatabaseConnection` (Singleton thread-safe)
+- **Service** : Logique métier (`ValidationService`, `UnicityService`, `LoggerService`)
+- **ViewModel** : Présentation (`ClientViewModel`, `ProspectViewModel`, `ContratViewModel`)
+- **View** : Interface Swing (`AccueilView`, `ListeView`, `FormulaireView`, `ListeContratsView`)
+- **Util** : Utilitaires (`SQLExceptionAnalyzer`, `JdbcUtil`, `DisplayDialog`)
 
-### Repository Client avec Comparator
+### Base de Données (5 tables)
+- **adresse** 
+- **societe** (raison_sociale UNIQUE)
+- **client** 
+- **prospect** 
+- **contrat** (ON DELETE RESTRICT)
 
-- Tri par défaut: raison sociale ascendante, insensible à la casse, null-safe.
-- findAll() retourne une copie triée, idéale pour les vues et les JComboBox.
+**Relations :**
+- `societe.adresse_id` → `adresse.id_adresse`
+- `client.id_societe` → `societe.id_societe` (UNIQUE)
+- `prospect.id_societe` → `societe.id_societe` (UNIQUE)
+- `contrat.client_id` → `client.id_client`
 
-### Suppression en cascade des contrats
+---
 
-- delete(clientId) supprime d’abord tous les contrats du client via ContratRepository.delete(contratId), nettoie la liste interne des contrats dans Client, puis supprime le Client.
-- Bonnes pratiques : validation d’entrée, itération sur copie et retour boolean.
+## ✨ Principales Caractéristiques
 
-### Préchargement de contrats
+### Gestion Entités
+- CRUD complet (Créer, Lire, Modifier, Supprimer) pour Clients, Prospects, Contrats
+- Navigation inter-entités (Client → Contrats)
 
-- Méthodes de semis :
-    - Dans ClientRepository avec injection de ContratRepository et méthode privée precargarContratos.
-    - Centralisée dans Main, après création des repositories, en appelant une fonction utilitaire.
-    - Via ContratViewModel pour réutiliser la logique métier et le logging.
+### Validations Métier
+- **Email** : Format RFC 5322 (regex)
+- **Téléphone** : 10 chiffres (France)
+- **Code postal** : 5 chiffres
+- **Chiffre affaires** : ≥ 200 €
+- **Nombre employés** : ≥ 1
 
-### Service d’unicité
+### Unicité Raison Sociale
+- Vérification inter-tables (`client` + `prospect`)
+- Sensible à la casse
+- Exclusion ID lors de modifications
 
-- UnicityService vérifie l’existence d’une raison sociale dans Clients et Prospects, insensible à la casse, et exclut l’ID courant lors d’une modification.
+### Persistence MySQL
+- Transactions ACID (rollback automatique sur erreur)
+- PreparedStatements (sécurité SQL Injection)
+- Connection pooling (Singleton)
+- Gestion ressources JDBC (try-with-resources + `JdbcUtil`)
 
-### Logs de démarrage/fin
+### Gestion Erreurs
+- `DAOException` typée (9 codes d'erreur)
+- `SQLExceptionAnalyzer` (analyse SQLState)
+- Logging multi-niveaux (SEVERE/INFO/FINE)
+- Messages utilisateur contextuels
 
-- “Application démarrée” après l’initialisation des repositories/services/viewmodels et avant l’affichage de la fenêtre principale.
-- “Application terminée” dans:
-    - Bouton Quitter.
-    - WindowListener (windowClosing/windowClosed) de la fenêtre principale.
+---
 
-### Prérequis
+### 🚀 Prérequis
 
-- Java 17+ (ou version compatible avec votre environnement).
-- JUnit 5 pour les tests (junit-jupiter-api, junit-jupiter-params, junit-jupiter-engine).
+- **Java** : 25 (avec JDBC)
+- **MySQL** : 8.0+
 
-### Construction et exécution
+### 🧪 Tests Unitaires
+### Couverture
+- ClientTest : 25+ tests (création, validation, setters, @ParameterizedTest)
 
-- Compilation:
-    - javac -d bin -sourcepath src src/Main.java
-- Exécution :
-    - java -cp bin Main
-- Tests JUnit5 (console launcher):
-    - java -cp bin:junit-platform-console-standalone.jar org.junit.platform.console.ConsoleLauncher --scan-classpath
+- ProspectTest : 25+ tests (dates, Interesse enum, formatage)
 
-### Tests unitaires
+- UnicityServiceTest : 20 tests (mocking DAO, détection doublons)
 
-- ValidationServiceTest : tests paramétrés pour code postal, téléphone, email, null/empty.
-- ClientTest : création, règles métier, gestion de contrats.
-- ProspectTest : dates, enum Interesse, format jj/MM/aaaa.
-- UnicityServiceTest : détection de doublons inter-entités, exclusion par ID, insensibilité à la casse.
+- ValidationServiceTest : Tests paramétrés (email, téléphone, code postal)
 
-### Bonnes pratiques appliquées
+### Dépendances :
 
-- MVVM : la View ne contient pas de logique métier.
-- Validations centralisées (regex et règles métier).
-- Unicité inter-entités avant création/modification.
-- Repositories en mémoire isolant l’accès aux données, tri et copies défensives.
-- Suppression en cascade atomique en mémoire.
-- Tests paramétrés, @Nested, assertAll, messages explicites et cas limites.
-- Logging structuré pour cycle de vie de l’application.
+- JUnit 5.10.1 (junit-jupiter-api, junit-jupiter-params)
 
-### Personnalisation rapide
+### 🔧 Configuration de la base de données
+### 📋 Prérequis
 
-- Activer/désactiver la précharge : appeler ou non la méthode de semis dans Main.
-- Modifier l’ordre de tri par défaut: ajuster le Comparator BY_RAISON_SOCIALE.
-- Étendre AccueilView : ajouter champ de filtrage au-dessus du JComboBox si grand volume d’entités.
-- Remplacer les repositories en mémoire par une persistance sans impacter View/ViewModel.
+- MySQL 8.0+ installé et démarré
+- Base de données `ecf_dao` créée (voir script `ecf_dao_struct.sql`)
+- Driver JDBC MySQL ajouté au projet
 
-### Licence et auteur
+---
 
-- Projet pédagogique ECF POO – AFPA. Auteur: Julio FERMIN. Étudiant Conception et Développement d’Applications.
+### ⚙️ Installation
+
+### Étape 1 : Copier le fichier d'exemple
+
+
+Ou dans Windows :
+sur le dossier resources, copy database.properties.example vers database.properties. Ne pas oublier faire click droit sur le dossier resources  "Mark Directory As -> Resource Root"  
+
+### Étape 2 : Configurer vos paramètres
+Ouvrir database.properties et modifier :
+db.password=VOTRE_MOT_DE_PASSE_MYSQL
+
+Paramètres disponibles :
+
+| Paramètre   | Description             | Valeur par défaut                   |
+| ----------- | ----------------------- | ----------------------------------- |
+| db.url      | URL JDBC de connexion   | jdbc:mysql://localhost:3306/ecf_dao?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC |
+| db.username | Nom d'utilisateur MySQL | root                                |
+| db.password | Mot de passe MySQL      | À configurer                        |
+| db.driver   | Classe du driver JDBC   | com.mysql.cj.jdbc.Driver            |
+
+🔒 Sécurité
+
+⚠️ IMPORTANT : Le fichier database.properties contient votre mot de passe et ne doit jamais être commité sur Git.
+
+### Gestion Exceptions
+9 codes d'erreur DAOException.ErrorCode :
+
+- CONNECTION_ERROR - Connexion BDD échouée
+
+- CREATE_ERROR - Insertion échouée
+
+- READ_ERROR - Lecture échouée
+
+- UPDATE_ERROR - Modification échouée
+
+- DELETE_ERROR - Suppression échouée
+
+- FOREIGN_KEY_VIOLATION - Contrainte FK
+
+- UNIQUE_CONSTRAINT_VIOLATION - Doublon raison sociale
+
+- NOT_NULL_VIOLATION - Champ obligatoire manquant
+
+- INVALID_PARAMETER - Paramètre invalide
+
+### 📖 Utilisation
+### Interface d'Accueil
+- Sélection Clients ou Prospects (radio buttons)
+
+- Actions : Créer, Modifier, Supprimer, Voir Contrats, Quitter
+
+- Navigation fluide entre entités
+
+### 🎓 Bonnes Pratiques Implémentées
+- ✅ Architecture DAO - Séparation logique/données
+- ✅ Singleton Thread-Safe - Une connexion MySQL partagée
+- ✅ Transactions ACID - Rollback automatique sur erreur
+- ✅ PreparedStatements - Protection SQL Injection
+- ✅ Validations centralisées - ValidationService réutilisable
+- ✅ Exceptions typées - DAOException avec codes d'erreur
+- ✅ Logging structuré - 3 niveaux (SEVERE/WARNING/INFO)
+- ✅ Tests paramétrés - @ParameterizedTest JUnit 5
+
+### 📚 Documentation
+- Javadoc : docs/api/index.html 
+
+- MCD : docs/conception/MCD_ECF_DAO.loo (application Looping)
+
+- Scripts SQL : docs/conception/bdd/
+
+- Dictionnaire données : docs/conception/bdd/dictionnaire_donnees.md
+
+## 🐛 Résolution Problèmes Courants
+### Erreur connexion MySQL
+DAOException: CONNECTION_ERROR - Communications link failure
+### Solution :
+
+- Vérifier MySQL démarré : sudo systemctl status mysql
+
+- Tester connexion : mysql -u votre_user -p votre_password
+
+- Vérifier URL/USER/PASSWORD dans database.properties
+
+## 📝 Roadmap
+- Migration vers Spring Boot + JPA/Hibernate
+
+- Authentification utilisateurs (table users)
+
+- Historique modifications (audit trail)
+
+- Export PDF/Excel des contrats
+
+- API REST pour intégration externe
+
+## 👨‍💻 Auteur & Licence
+### Projet pédagogique ECF DAO – AFPA
+
+- Auteur : Julio FERMIN
+
+- Formation : Concepteur Développeur d'Applications (CDA)
+
+- Date : Janvier 2026
+
+- Version : 2.0
+
+## 🔗 Ressources
+- Documentation MySQL
+
+- Guide JDBC
+
+- JUnit 5
+
+- Pattern DAO
