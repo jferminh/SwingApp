@@ -170,13 +170,5 @@ public class Adresse {
         return numeroRue + " " + nomRue + " " + codePostal + " " + ville;
     }
 
-    /**
-     * Réinitialise le compteur d'identifiants des adresses à 1.
-     * <p>
-     * Cette méthode statique est généralement utilisée pour les tests.
-     * </p>
-     */
-    public static void resetCompteur() {
-        compteurId = 1;
-    }
+
 }

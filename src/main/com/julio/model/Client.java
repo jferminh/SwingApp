@@ -29,9 +29,6 @@ import java.util.List;
  */
 public class Client extends Societe {
 
-    /** Compteur statique pour générer automatiquement les identifiants des clients */
-//    private static int compteurId = 1;
-
     /** Chiffre d'affaires du client en euros (minimum 200) */
     private long chiffreAffaires;
 
@@ -132,21 +129,12 @@ public class Client extends Societe {
      *
      * @param contrat le contrat à supprimer
      */
+    @Deprecated
     public void supprimerContrat(Contrat contrat) {
         if (contrat != null) {
             contrats.remove(contrat);
         }
     }
-
-    /**
-     * Réinitialise le compteur d'identifiants des clients à 1.
-     * <p>
-     * Cette méthode statique est généralement utilisée pour les tests.
-     * </p>
-     */
-//    public static void resetCompteur() {
-//        compteurId = 1;
-//    }
 
     /**
      * Retourne une représentation textuelle du client.

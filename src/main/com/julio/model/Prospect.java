@@ -136,13 +136,4 @@ public class Prospect extends Societe {
         return getRaisonSociale() + " (Prospect)";
     }
 
-    /**
-     * Réinitialise le compteur d'identifiants des prospects à 1.
-     * <p>
-     * Cette méthode statique est généralement utilisée pour les tests.
-     * </p>
-     */
-    public static void resetCompteur() {
-        compteurId = 1;
-    }
 }
