@@ -1,4 +1,4 @@
-# 📊 ECF Reverso - Application de Gestion Clients/Prospects
+# 📊 ECF - Application de Gestion Clients/Prospects
 
 > Application desktop Java Swing pour gérer Clients, Prospects et Contrats avec persistance MySQL, architecture DAO et pattern Singleton.
 

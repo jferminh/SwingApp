@@ -223,7 +223,7 @@ public class ListeContratsView extends JFrame {
         String montantActuel = (String) table.getValueAt(selectedRow, 2);
 
         // Extraire le montant numérique (enlever " €" et espaces)
-        String montantStr = montantActuel.replace(" €", "").replace(",", "").trim();
+        String montantStr = montantActuel.replace(" €", "").replace(",", ".").trim();
 
         // Pré-remplir les champs
         JTextField txtNom = new JTextField(nomActuel, 20);
