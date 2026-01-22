@@ -31,6 +31,7 @@ import java.util.Optional;
  * @see ContratRepository
  * @since 19/11/2025
  */
+@Deprecated
 public class ClientRepository {
 
     /**

@@ -25,6 +25,7 @@ import static main.com.julio.service.LoggingService.LOGGER;
  * </p>
  *
  */
+@Deprecated
 public class MainApp {
 
     /**
@@ -34,24 +35,24 @@ public class MainApp {
      */
     void main() throws ValidationException, IOException {
         // Logging fichier + formatter custom
-        LoggingService.intFichierLog();
-        LOGGER.log(Level.INFO, "Démarrage de la application");
-
-        // Look & Feel natif (fallback + log SEVERE en cas d'échec)
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception e) {
-            e.printStackTrace();
-            LOGGER.log(Level.SEVERE, e.getMessage(), e);
-        }
-
-        // Repositories en mémoire (clients préchargés avec contrats)
-        ContratRepository contratRepo = new ContratRepository();
-        ClientRepository clientRepo = new ClientRepository(contratRepo);
-        ProspectRepository prospectRepo = new ProspectRepository();
-
-        // Services transverses
-        UnicityService unicityService = new UnicityService(clientRepo, prospectRepo);
+//        LoggingService.intFichierLog();
+//        LOGGER.log(Level.INFO, "Démarrage de la application");
+//
+//        // Look & Feel natif (fallback + log SEVERE en cas d'échec)
+//        try {
+//            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            LOGGER.log(Level.SEVERE, e.getMessage(), e);
+//        }
+//
+//        // Repositories en mémoire (clients préchargés avec contrats)
+//        ContratRepository contratRepo = new ContratRepository();
+//        ClientRepository clientRepo = new ClientRepository(contratRepo);
+//        ProspectRepository prospectRepo = new ProspectRepository();
+//
+//        // Services transverses
+//        UnicityService unicityService = new UnicityService(clientRepo, prospectRepo);
 
         // ViewModels (injection par constructeur)
 //        ClientViewModel clientVM = new ClientViewModel(clientRepo, contratRepo, unicityService);

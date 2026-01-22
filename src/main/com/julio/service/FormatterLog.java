@@ -39,6 +39,7 @@ import java.util.logging.LogRecord;
  * @see LogRecord
  * @see java.util.logging.Logger
  */
+@Deprecated
 public class FormatterLog extends Formatter {
 
     /**

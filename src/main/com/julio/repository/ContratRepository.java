@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
  * @see Contrat
  * @see ClientRepository
  */
+@Deprecated
 public class ContratRepository {
 
     /** Collection en mémoire contenant tous les contrats */

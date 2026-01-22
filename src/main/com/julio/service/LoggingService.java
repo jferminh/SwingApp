@@ -37,6 +37,7 @@ import java.util.logging.Logger;
  * @see Logger
  * @see FileHandler
  */
+@Deprecated
 public class LoggingService {
 
     /** Chemin du fichier de log dans le répertoire logs/ */

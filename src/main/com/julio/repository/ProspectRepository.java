@@ -31,6 +31,7 @@ import java.util.Optional;
  * @see Prospect
  * @see Interesse
  */
+@Deprecated
 public class ProspectRepository {
 
     /** Collection en mémoire contenant tous les prospects */
