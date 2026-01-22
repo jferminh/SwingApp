@@ -1,6 +1,7 @@
 package main.com.julio.view;
 
 import main.com.julio.exception.DAOException;
+import main.com.julio.exception.ValidationException;
 import main.com.julio.model.Client;
 import main.com.julio.util.DisplayDialog;
 import main.com.julio.viewmodel.ClientViewModel;
@@ -12,11 +13,12 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 
 /**
- * Vue d'affichage des contrats d'un client spécifique.
+ * Vue d'affichage et de gestion des contrats d'un client spécifique.
+ * Permet les opérations CRUD sur les contrats associés à un client.
  *
  * @author Julio FERMIN
- * @version 1.1
- * @since 21/01/2026
+ * @version 1.2
+ * @since 22/01/2026
  */
 public class ListeContratsView extends JFrame {
 
@@ -24,8 +26,8 @@ public class ListeContratsView extends JFrame {
     private final ProspectViewModel prospectVM;
     private final ContratViewModel contratVM;
 
-    private final Client client;  // ✅ Objet client complet
-    private final String origin;
+    private final Client client;  // Client propriétaire des contrats
+    private final String origin;  // Vue d'origine pour navigation retour
 
     private JTable table;
     private DefaultTableModel tableModel;
@@ -47,7 +49,7 @@ public class ListeContratsView extends JFrame {
         this.clientVM = clientVM;
         this.prospectVM = prospectVM;
         this.contratVM = contratVM;
-        this.client = client;  // ✅ Stockage objet client
+        this.client = client;
         this.origin = origin;
 
         initComponents();
@@ -64,23 +66,24 @@ public class ListeContratsView extends JFrame {
         setLocationRelativeTo(null);
         setResizable(false);
 
+        // Panel principal avec BorderLayout
         JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // En-tête
+        // === EN-TÊTE ===
         JPanel headerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JLabel titre = new JLabel("Contrats de " + client.getRaisonSociale());
         titre.setFont(new Font("Arial", Font.BOLD, 18));
         headerPanel.add(titre);
         mainPanel.add(headerPanel, BorderLayout.NORTH);
 
-        // Table
+        // === TABLE ===
         table = new JTable();
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         JScrollPane scrollPane = new JScrollPane(table);
         mainPanel.add(scrollPane, BorderLayout.CENTER);
 
-        // Boutons
+        // === BOUTONS ===
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
 
         JButton btnCreer = new JButton("Créer Contrat");
@@ -113,7 +116,7 @@ public class ListeContratsView extends JFrame {
      */
     private void chargerDonnees() {
         try {
-            // ✅ CORRECTION : Passer l'objet client complet
+            // ✅ Utiliser la méthode construireTableModel(Client)
             tableModel = contratVM.construireTableModel(client);
             table.setModel(tableModel);
 
@@ -149,11 +152,59 @@ public class ListeContratsView extends JFrame {
     }
 
     /**
-     * Ouvre le formulaire de création de contrat.
+     * Affiche un dialogue pour créer un nouveau contrat.
+     * Valide les données et rafraîchit la table en cas de succès.
      */
     private void creerContrat() {
-        // TODO: Implémenter FormulaireContratView
-        DisplayDialog.messageInfo("Info", "Fonctionnalité en cours de développement");
+        JTextField txtNom = new JTextField(20);
+        JTextField txtMontant = new JTextField(20);
+
+        // Panel de saisie avec GridLayout
+        JPanel panel = new JPanel(new GridLayout(2, 2, 5, 5));
+        panel.add(new JLabel("Nom du contrat :"));
+        panel.add(txtNom);
+        panel.add(new JLabel("Montant (€) :"));
+        panel.add(txtMontant);
+
+        int result = JOptionPane.showConfirmDialog(this, panel,
+                "Créer un contrat", JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE);
+
+        if (result != JOptionPane.OK_OPTION) {
+            return;  // Annulation
+        }
+
+        try {
+            String nom = txtNom.getText().trim();
+            double montant = Double.parseDouble(txtMontant.getText().trim());
+
+            // ✅ Appel ViewModel avec gestion exceptions
+            contratVM.creerContrat(client.getId(), nom, montant);
+
+            DisplayDialog.messageInfo("Succès", "Contrat créé avec succès!");
+            chargerDonnees();  // Rafraîchir table
+
+        } catch (NumberFormatException e) {
+            // ✅ Erreur de format du montant
+            DisplayDialog.messageWarning("Format Invalide",
+                    "Le montant doit être un nombre valide.\nExemple : 1500.50");
+
+        } catch (ValidationException e) {
+            // ✅ Erreur de validation métier
+            DisplayDialog.messageWarning("Validation", e.getMessage());
+
+        } catch (DAOException e) {
+            // ✅ Erreur DAO (connexion, FK, etc.)
+            String message = switch (e.getErrorCode()) {
+                case CONNECTION_ERROR ->
+                        "Impossible de se connecter à la base de données.";
+                case FOREIGN_KEY_VIOLATION ->
+                        "Le client n'existe plus dans la base de données.";
+                default ->
+                        "Erreur lors de la création : " + e.getMessage();
+            };
+            DisplayDialog.messageError("Erreur", message);
+        }
     }
 
     /**
@@ -168,8 +219,62 @@ public class ListeContratsView extends JFrame {
         }
 
         int contratId = (int) table.getValueAt(selectedRow, 0);
-        // TODO: Implémenter FormulaireContratView pour modification
-        DisplayDialog.messageInfo("Info", "Modification contrat ID=" + contratId);
+        String nomActuel = (String) table.getValueAt(selectedRow, 1);
+        String montantActuel = (String) table.getValueAt(selectedRow, 2);
+
+        // Extraire le montant numérique (enlever " €" et espaces)
+        String montantStr = montantActuel.replace(" €", "").replace(",", "").trim();
+
+        // Pré-remplir les champs
+        JTextField txtNom = new JTextField(nomActuel, 20);
+        JTextField txtMontant = new JTextField(montantStr, 20);
+
+        JPanel panel = new JPanel(new GridLayout(2, 2, 5, 5));
+        panel.add(new JLabel("Nom du contrat :"));
+        panel.add(txtNom);
+        panel.add(new JLabel("Montant (€) :"));
+        panel.add(txtMontant);
+
+        int result = JOptionPane.showConfirmDialog(this, panel,
+                "Modifier le contrat", JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE);
+
+        if (result != JOptionPane.OK_OPTION) {
+            return;  // Annulation
+        }
+
+        try {
+            String nom = txtNom.getText().trim();
+            double montant = Double.parseDouble(txtMontant.getText().trim());
+
+            // ✅ Appel ViewModel
+            boolean success = contratVM.modifierContrat(contratId, nom, montant);
+
+            if (success) {
+                DisplayDialog.messageInfo("Succès", "Contrat modifié avec succès!");
+                chargerDonnees();  // Rafraîchir table
+            } else {
+                DisplayDialog.messageWarning("Attention", "Le contrat n'existe plus");
+            }
+
+        } catch (NumberFormatException e) {
+            DisplayDialog.messageWarning("Format Invalide",
+                    "Le montant doit être un nombre valide.\nExemple : 1500.50");
+
+        } catch (ValidationException e) {
+            DisplayDialog.messageWarning("Validation", e.getMessage());
+
+        } catch (DAOException e) {
+            String message = switch (e.getErrorCode()) {
+                case CONNECTION_ERROR ->
+                        "Impossible de se connecter à la base de données.";
+                case ENTITY_NOT_FOUND ->
+                        "Le contrat n'existe plus dans la base de données.";
+                default ->
+                        "Erreur lors de la modification : " + e.getMessage();
+            };
+            DisplayDialog.messageError("Erreur", message);
+        }
     }
 
     /**
