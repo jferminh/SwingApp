@@ -16,15 +16,25 @@ import java.util.logging.Logger;
 import static main.com.julio.util.JdbcUtil.closeResources;
 
 /**
- * Classe DAO pour la gestion de la table société.
- * Gère les informations communes aux clients et prospects.
+ * DAO pour les opérations sur la table {@code societe}.
+ * <p>
+ * <b>Pattern Méthodes Participantes :</b> Les méthodes de cette classe
+ * participent à des transactions gérées par {@link ClientDAO} et {@link ProspectDAO}.
+ * </p>
  *
- * Cette classe fournit des méthodes protégées pour les opérations CRUD
- * sur la partie commune des entités Client et Prospect.
+ * <h2>Méthodes Protected</h2>
+ * <ul>
+ *   <li>{@link #createSociete(Societe)} - Crée une société</li>
+ *   <li>{@link #saveSociete(Societe, Integer, Connection)} - Modifie une société</li>
+ *   <li>{@link #deleteSociete(Connection, Integer)} - Supprime une société</li>
+ * </ul>
  *
  * @author Julio FERMIN
  * @version 2.0
  * @since 15/01/2026
+ * @see Societe
+ * @see ClientDAO
+ * @see ProspectDAO
  */
 public abstract class SocieteDAO {
 

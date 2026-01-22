@@ -14,16 +14,26 @@ import java.util.logging.Logger;
 import static main.com.julio.util.JdbcUtil.closeResources;
 
 /**
- * Classe DAO pour la gestion des adresses en base de données.
- * Implémente le pattern Data Access Object (DAO) pour l'entité Adresse.
+ * DAO pour les opérations sur la table {@code adresse}.
  * <p>
- * Les adresses sont partagées entre clients et prospects.
- * La suppression d'une adresse n'est possible que si elle n'est référencée
- * par aucune société (client ou prospect).
+ * <b>Pattern Méthodes Participantes :</b> Les méthodes de cette classe
+ * participent à des transactions gérées par {@link ClientDAO} et {@link ProspectDAO}.
+ * Elles reçoivent une connexion en paramètre et ne gèrent pas commit/rollback.
+ * </p>
+ *
+ * <h2>Méthodes Protected</h2>
+ * <ul>
+ *   <li>{@link #create(Adresse)} - Crée une adresse</li>
+ *   <li>{@link #save(Adresse, Connection)} - Modifie une adresse</li>
+ *   <li>{@link #deleteAdresse(Connection, Integer)} - Supprime une adresse</li>
+ * </ul>
  *
  * @author Julio FERMIN
  * @version 2.0
  * @since 15/01/2026
+ * @see Adresse
+ * @see ClientDAO
+ * @see ProspectDAO
  */
 public class AdresseDAO {
     private static final Logger LOGGER = Logger.getLogger(AdresseDAO.class.getName());

@@ -18,21 +18,34 @@ import java.util.logging.Logger;
 import static main.com.julio.util.JdbcUtil.closeResources;
 
 /**
- * Classe DAO pour la gestion des prospects en base de données.
- * Implémente le pattern Data Access Object (DAO) pour l'entité Prospect.
+ * DAO pour la gestion de la persistance des prospects.
  * <p>
- * Structure de la base de données :
- * Table prospect : (id, id_societe FK, date_prospection, interesse)
- * Table societe : (id, raison_sociale, adresse_id FK, telephone, email, commentaires, type_societe)
- * Table adresse : (id, numero_rue, nom_rue, code_postal, ville)
- * <p>
- * Cette classe gère les opérations CRUD sur les prospects et leurs relations
- * avec les sociétés et adresses, en utilisant des transactions pour garantir
- * l'intégrité des données.
+ * Gère les opérations CRUD sur la table {@code prospect} et les tables
+ * associées ({@code societe}, {@code adresse}) via transactions ACID.
+ * </p>
+ *
+ * <h2>Opérations</h2>
+ * <ul>
+ *   <li>{@link #create(Prospect)} - Crée un prospect</li>
+ *   <li>{@link #findById(Integer)} - Recherche par ID</li>
+ *   <li>{@link #findAll()} - Liste tous les prospects</li>
+ *   <li>{@link #findByRaisonSociale(String)} - Recherche par raison sociale</li>
+ *   <li>{@link #save(Prospect)} - Modifie un prospect</li>
+ *   <li>{@link #delete(Integer)} - Supprime un prospect</li>
+ * </ul>
+ *
+ * <h2>Contraintes</h2>
+ * <ul>
+ *   <li><b>Unique</b> : raison_sociale</li>
+ *   <li><b>Enum</b> : interesse (OUI=1, NON=0) - mapping automatique</li>
+ * </ul>
  *
  * @author Julio FERMIN
  * @version 2.0
- * @since 20/01/2026
+ * @since 15/01/2026
+ * @see Prospect
+ * @see Interesse
+ * @see DAOException
  */
 public class ProspectDAO extends SocieteDAO {
 

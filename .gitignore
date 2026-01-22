@@ -10,6 +10,9 @@ out/
 *.log
 logs/
 
+# Java Docs
+/docs/api
+
 # Fichiers compilés
 *.jar
 

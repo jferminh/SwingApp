@@ -2,29 +2,57 @@ package main.com.julio.dao;
 
 import main.com.julio.exception.DAOException;
 import main.com.julio.exception.ValidationException;
-import main.com.julio.model.*;
+import main.com.julio.model.Adresse;
+import main.com.julio.model.Client;
+import main.com.julio.model.Contrat;
 import main.com.julio.service.LoggerService;
 import main.com.julio.util.SQLExceptionAnalyzer;
 
 import java.sql.*;
-import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static main.com.julio.util.JdbcUtil.closeResources;
 
 /**
- * Classe DAO pour la gestion des clients en base de données.
- * Implémente le pattern Data Access Object (DAO) pour l'entité Client.
+ * DAO pour la gestion de la persistance des clients.
  * <p>
- * Cette classe gère les opérations CRUD sur les clients et leurs relations
- * avec les adresses et les contrats, en utilisant des transactions pour
- * garantir l'intégrité des données.
+ * Gère les opérations CRUD sur la table {@code client} et les tables
+ * associées ({@code societe}, {@code adresse}) via transactions ACID.
+ * </p>
+ *
+ * <h2>Opérations</h2>
+ * <ul>
+ *   <li>{@link #create(Client)} - Crée un client</li>
+ *   <li>{@link #findById(Integer)} - Recherche par ID</li>
+ *   <li>{@link #findAll()} - Liste tous les clients</li>
+ *   <li>{@link #findByRaisonSociale(String)} - Recherche par raison sociale</li>
+ *   <li>{@link #save(Client)} - Modifie un client</li>
+ *   <li>{@link #delete(Integer)} - Supprime un client</li>
+ * </ul>
+ *
+ * <h2>Contraintes</h2>
+ * <ul>
+ *   <li><b>Unique</b> : raison_sociale</li>
+ *   <li><b>FK</b> : contrat.client_id → client.id_client (NO CASCADE)</li>
+ * </ul>
+ *
+ * <h2>Exceptions Fréquentes</h2>
+ * <ul>
+ *   <li><b>UNIQUE_CONSTRAINT_VIOLATION</b> - Raison sociale existe déjà</li>
+ *   <li><b>FOREIGN_KEY_VIOLATION</b> - Client a des contrats (delete)</li>
+ *   <li><b>ENTITY_NOT_FOUND</b> - Client inexistant (findById, save, delete)</li>
+ * </ul>
  *
  * @author Julio FERMIN
  * @version 2.0
  * @since 15/01/2026
+ * @see Client
+ * @see DAOException
  */
 public class ClientDAO extends SocieteDAO {
 

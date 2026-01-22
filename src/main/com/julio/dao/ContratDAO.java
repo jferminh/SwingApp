@@ -15,16 +15,32 @@ import java.util.logging.Logger;
 import static main.com.julio.util.JdbcUtil.closeResources;
 
 /**
- * Classe DAO pour la gestion des contrats en base de données.
- * Implémente le pattern Data Access Object (DAO) pour l'entité Contrat.
+ * DAO pour la gestion de la persistance des contrats.
  * <p>
- * Cette classe gère les opérations CRUD sur les contrats et permet
- * de récupérer les contrats associés à un client spécifique.
- * Les transactions sont utilisées pour garantir l'intégrité des données.
+ * Gère les opérations CRUD sur la table {@code contrat}.
+ * </p>
+ *
+ * <h2>Opérations</h2>
+ * <ul>
+ *   <li>{@link #create(Contrat)} - Crée un contrat</li>
+ *   <li>{@link #findById(Integer)} - Recherche par ID</li>
+ *   <li>{@link #findByIdClient(Integer)} - Liste contrats d'un client</li>
+ *   <li>{@link #findAll()} - Liste tous les contrats</li>
+ *   <li>{@link #save(Contrat)} - Modifie un contrat</li>
+ *   <li>{@link #delete(Integer)} - Supprime un contrat</li>
+ * </ul>
+ *
+ * <h2>Contraintes</h2>
+ * <ul>
+ *   <li><b>FK</b> : client_id → client.id_client</li>
+ *   <li><b>NOT NULL</b> : nom_contrat, montant, client_id</li>
+ * </ul>
  *
  * @author Julio FERMIN
- * @version 2.1
- * @since 21/01/2026
+ * @version 2.0
+ * @since 15/01/2026
+ * @see Contrat
+ * @see DAOException
  */
 public class ContratDAO {
 
