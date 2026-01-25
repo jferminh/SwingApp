@@ -185,17 +185,6 @@ DAOException: CONNECTION_ERROR - Communications link failure
 
 - Vérifier URL/USER/PASSWORD dans database.properties
 
-## 📝 Roadmap
-- Migration vers Spring Boot + JPA/Hibernate
-
-- Authentification utilisateurs (table users)
-
-- Historique modifications (audit trail)
-
-- Export PDF/Excel des contrats
-
-- API REST pour intégration externe
-
 ## 👨‍💻 Auteur & Licence
 ### Projet pédagogique ECF DAO – AFPA
 
@@ -206,12 +195,3 @@ DAOException: CONNECTION_ERROR - Communications link failure
 - Date : Janvier 2026
 
 - Version : 2.0
-
-## 🔗 Ressources
-- Documentation MySQL
-
-- Guide JDBC
-
-- JUnit 5
-
-- Pattern DAO
